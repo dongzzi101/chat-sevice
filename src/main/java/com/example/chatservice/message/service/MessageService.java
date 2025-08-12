@@ -35,10 +35,10 @@ public class MessageService {
         messageRepository.save(message);
     }
 
-    public List<MessageResponse> getMessages() {
+    public List<MessageResponse> getMessages(Long userId) {
         List<MessageResponse> messageResponses = new ArrayList<>();
 
-        List<Message> messages = messageRepository.findAll();
+        List<Message> messages = messageRepository.findAllByReceiverId(userId);
 
         for (Message message : messages) {
             MessageResponse messageResponse = new MessageResponse(message.getMessage());

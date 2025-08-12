@@ -17,12 +17,12 @@ public class ChatController {
 
     private final ChatService chatService;
 
-    @PostMapping("/api/chat")
+    @PostMapping("/api/v1/chat")
     public void createChatRoom(@RequestBody ChatRequest chatRequest) {
         chatService.createChatRoom(chatRequest);
     }
 
-    @GetMapping("/api/chats")
+    @GetMapping("/api/v1/chats")
     public List<ChatResponse> getChatRooms() {
         List<ChatResponse> chatResponses = chatService.getChatRooms();
         return chatResponses;
