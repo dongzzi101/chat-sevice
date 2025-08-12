@@ -4,6 +4,8 @@ import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.repository.MessageRepository;
+import com.example.chatservice.user.entity.User;
+import com.example.chatservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,11 +18,17 @@ import java.util.List;
 public class MessageService {
 
     private final MessageRepository messageRepository;
+    private final UserRepository userRepository;
 
     @Transactional
-    public void sendMessage(MessageRequest messageRequest) {
+    public void sendMessage(MessageRequest messageRequest, Long userId, Long receiverId) {
+
+        User user = userRepository.findById(userId).orElseThrow();
+        User receiverUser = userRepository.findById(receiverId).orElseThrow();
 
         Message message = Message.builder()
+                .sender(user)
+                .receiver(receiverUser)
                 .message(messageRequest.getMessage())
                 .build();
 
