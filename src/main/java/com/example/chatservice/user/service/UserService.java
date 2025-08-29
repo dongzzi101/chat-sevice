@@ -1,7 +1,9 @@
 package com.example.chatservice.user.service;
 
 import com.example.chatservice.user.controller.request.UserCreateRequest;
+import com.example.chatservice.user.controller.request.UserLoginRequest;
 import com.example.chatservice.user.controller.response.UserCreateResponse;
+import com.example.chatservice.user.controller.response.UserLoginResponse;
 import com.example.chatservice.user.entity.User;
 import com.example.chatservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,5 +30,20 @@ public class UserService {
                 .userId(user.getId())
                 .username(user.getUsername())
                 .build();
+    }
+
+    @Transactional
+    public UserLoginResponse login(UserLoginRequest userLoginRequest) {
+        User user = userRepository.findByUsername(userLoginRequest.getUsername());
+
+        if (user == null) {
+            throw new RuntimeException("User not found");
+        }
+
+        UserLoginResponse userLoginResponse = UserLoginResponse.builder()
+                .username(user.getUsername())
+                .build();
+
+        return userLoginResponse;
     }
 }

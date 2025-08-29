@@ -25,8 +25,8 @@ public class Message {
     @ManyToOne(fetch = FetchType.LAZY)
     private User receiver;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    private Chat chatRoom;
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Chat chatRoom;
 
     @Builder
     public Message(String message, User sender, User receiver) {
