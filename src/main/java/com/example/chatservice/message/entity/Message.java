@@ -34,4 +34,11 @@ public class Message {
         this.sender = sender;
         this.receiver = receiver;
     }
+
+    // TODO
+    /*
+    Message.receiver 제거
+    1:1 개인톡도 Chat 테이블에 채팅방 생성
+    모든 메시지는 sender + chatRoom으로 저장 및 조회
+     */
 }

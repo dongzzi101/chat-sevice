@@ -21,13 +21,12 @@ public class MessageService {
     private final UserRepository userRepository;
 
     @Transactional
-    public void sendMessage(MessageRequest messageRequest, String senderUsername, Long receiverId) {
-
-        User user = userRepository.findByUsername(senderUsername);
+    public void sendMessage(MessageRequest messageRequest, Long senderUserId, Long receiverId) {
+        User senderUser = userRepository.findById(senderUserId).orElseThrow();
         User receiverUser = userRepository.findById(receiverId).orElseThrow();
 
         Message message = Message.builder()
-                .sender(user)
+                .sender(senderUser)
                 .receiver(receiverUser)
                 .message(messageRequest.getMessage())
                 .build();

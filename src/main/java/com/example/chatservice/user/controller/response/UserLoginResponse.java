@@ -12,5 +12,6 @@ import lombok.ToString;
 public class UserLoginResponse {
 
     private String username;
+    private String accessToken;
 
 }

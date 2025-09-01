@@ -1,5 +1,6 @@
 package com.example.chatservice.user.service;
 
+import com.example.chatservice.jwt.JWTProvider;
 import com.example.chatservice.user.controller.request.UserCreateRequest;
 import com.example.chatservice.user.controller.request.UserLoginRequest;
 import com.example.chatservice.user.controller.response.UserCreateResponse;
@@ -40,10 +41,11 @@ public class UserService {
             throw new RuntimeException("User not found");
         }
 
-        UserLoginResponse userLoginResponse = UserLoginResponse.builder()
-                .username(user.getUsername())
-                .build();
+        String accessToken = JWTProvider.generateToken(user.getId(), user.getUsername());
 
-        return userLoginResponse;
+        return UserLoginResponse.builder()
+                .username(user.getUsername())
+                .accessToken(accessToken)
+                .build();
     }
 }
