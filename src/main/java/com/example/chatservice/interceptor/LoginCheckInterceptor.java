@@ -16,6 +16,7 @@ public class LoginCheckInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String authHeader = request.getHeader("Authorization");
 
+        // 어떤 토큰인지 구분 하는 것 !!
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return false;
@@ -40,3 +41,15 @@ public class LoginCheckInterceptor implements HandlerInterceptor {
         }
     }
 }
+// TODO 사진 s3
+//
+
+
+// send message
+// with image
+
+
+
+// 1. file upload server
+// 2. client url 획득
+// 3. (photo)send message(url)
