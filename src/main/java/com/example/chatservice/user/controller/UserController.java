@@ -49,3 +49,46 @@ public class UserController {
   6. @CurrentUser 같은 커스텀 어노테이션과 HandlerMethodArgumentResolver 사용
 
  */
+
+
+// 추가로 이미지 업로드 (사진전송)
+
+
+
+
+/*
+user table
+id
+nickname
+age
+created_at
+updated_at
+
+posts table
+id
+title
+content
+created_at
+thumbnail_image   (sfasdfsdaf-sadf9asdf-sadf-sadf0sadf-sdafsdaf)
+user_id
+
+s3
+
+select p.title, p.content, p.created_at, u.nickname from posts as p join users as u on posts.user_id = u.id;
+* */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -22,6 +22,8 @@ public class Message {
     @ManyToOne(fetch = FetchType.LAZY)
     private User sender;
 
+    // TODO : 굳이 receiver 필요할까?
+    // 1. user -> message -> chat Room -> 알아서 뿌려주면 되는 건가?
     @ManyToOne(fetch = FetchType.LAZY)
     private User receiver;
 

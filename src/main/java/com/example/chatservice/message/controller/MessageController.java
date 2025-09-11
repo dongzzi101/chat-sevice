@@ -16,15 +16,28 @@ public class MessageController {
 
     private final MessageService messageService;
 
-    @PostMapping("/api/v1/messages/{receiverId}")
+    // TODO : 메세지 전송 flow
+    /*
+     * 1. 메시지를 개인 or 단체를 보냄 (한 api 사용)
+     * 2. 어차피 개인방도 챗룸을 가진다.
+     */
+
+
+    // TODO : /api/v1/messages/{receiverId} ??
+    /**
+     * 1. receiverId 를 받아야하나?
+     * 2. 챗 Id에 보낸다면? -> 개인은 그냥 받는 느낌, 단체는 다 받는 느낌
+     *
+     */
+    @PostMapping("/api/v1/messages/{chatRoomId}")
     public void sendMessage(
             @CurrentUser UserPrincipal userPrincipal,
             @RequestBody MessageRequest message,
-            @PathVariable Long receiverId) {
+            @PathVariable Long chatRoomId) {
 
         Long senderUserId = userPrincipal.getId();
 
-        messageService.sendMessage(message, senderUserId, receiverId);
+        messageService.sendMessage(message, senderUserId, chatRoomId);
     }
 
     // 나에게 온 메시지를 들고오기 -> TODO readID? 확인하는 로직 넣기

@@ -7,13 +7,11 @@ import com.example.chatservice.chat.entity.UserChat;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
 import com.example.chatservice.message.controller.request.MessageRequest;
-import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.user.entity.User;
 import com.example.chatservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,10 +47,9 @@ public class ChatService {
         return chatResponses;
     }
 
-    // TODO Q1 : userchat 매핑엔티티를 만들었는데 userchat service를 만들어서 해야하는지 기존 chat service, user service 이용하는 건지
-    public void joinChatRoom(Long chatId, String username) {
+    public void joinChatRoom(Long chatId, Long userId) {
 
-        User user = userRepository.findByUsername(username);
+        User user = userRepository.findById(userId).orElseThrow();
         Chat chat = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
         // 코드의 가독성을 좋게하기위해 예외케이스는 빨리빨리 던져버린다.
         // 이렇게 던진 에러(익셉션)을 따로 핸들링 해줘야하는가? 아닌가
@@ -73,16 +70,16 @@ public class ChatService {
     // public String test(){}
 
     @Transactional
-    public void leaveChatRoom(Long chatId, String username) {
-        User user = userRepository.findByUsername(username);
+    public void leaveChatRoom(Long chatId, Long currentUserId) {
+        User user = userRepository.findById(currentUserId).orElseThrow();
         Chat chat = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
 
         userChatRepository.deleteByUserAndChat(user, chat);
     }
 
     @Transactional
-    public void sendMessage(Long chatId, MessageRequest messageRequest, String username) {
-        User user = userRepository.findByUsername(username);
+    public void sendMessage(Long chatId, MessageRequest messageRequest, Long currentUserId) {
+        User user = userRepository.findById(currentUserId).orElseThrow();
         Chat chat = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
 
 

@@ -1,9 +1,12 @@
 package com.example.chatservice.message.service;
 
+import com.example.chatservice.chat.entity.Chat;
+import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.repository.MessageRepository;
+import com.example.chatservice.user.CurrentUser;
 import com.example.chatservice.user.entity.User;
 import com.example.chatservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,16 +22,20 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final ChatRepository chatRepository;
 
     @Transactional
-    public void sendMessage(MessageRequest messageRequest, Long senderUserId, Long receiverId) {
+    public void sendMessage(MessageRequest messageRequest, Long senderUserId, Long chatRoomId) {
         User senderUser = userRepository.findById(senderUserId).orElseThrow();
-        User receiverUser = userRepository.findById(receiverId).orElseThrow();
+        Chat chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
+
+        User receiverUser = userRepository.findById(chatRoomId).orElseThrow();
 
         Message message = Message.builder()
                 .sender(senderUser)
                 .receiver(receiverUser)
                 .message(messageRequest.getMessage())
+
                 .build();
 
         messageRepository.save(message);
