@@ -8,6 +8,7 @@ import com.example.chatservice.user.CurrentUser;
 import com.example.chatservice.user.UserPrincipal;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,16 +19,32 @@ public class ChatController {
 
     private final ChatService chatService;
 
+    // TODO 3 : 채팅방 flow
+
+    /**
+     * 기존 메시지를 보낼 때 보내는 쪽에서 senderId를 헤더에 넣고 받는쪽에 receiverId를 넣어서 받았음
+     * e.g) /api/v1/messages/{receiverId}
+
+     * 근데 이렇게 하는 것보다 그룹 or 개인 상관없이 chatRoomId(채티방 Id)를 만들어서
+     * 거기가다 보내주는 게 나은 듯
+     * e.g) /api/v1/messages/{chatRoomId}
+
+     * 여기서 문제는 맨 처음 메시지를 chatRoomId가 없는데 어떻게 보내야하지?
+     * 1. userId를 임의적으로 받아서 만든다 (하나만 받으면 개인, 여러개 받으면 단체 채팅방)
+     */
+
     // 채팅방 만들기
     @PostMapping("/api/v1/chat")
-    public void createChatRoom(@RequestBody ChatRequest chatRequest) {
-        chatService.createChatRoom(chatRequest);
+    public void createChatRoom(@CurrentUser UserPrincipal userPrincipal, @RequestBody ChatRequest chatRequest) {
+        Long id = userPrincipal.getId();
+        chatService.createChatRoom(id, chatRequest);
     }
 
-    // 채팅방리스트 조회
+    // 내 채팅방 리스트 조회
     @GetMapping("/api/v1/chats")
-    public List<ChatResponse> getChatRooms() {
-        List<ChatResponse> chatResponses = chatService.getChatRooms();
+    public List<ChatResponse> getChatRooms(@CurrentUser UserPrincipal userPrincipal) {
+        Long currentUserId = userPrincipal.getId();
+        List<ChatResponse> chatResponses = chatService.getChatRooms(currentUserId);
         return chatResponses;
     }
 

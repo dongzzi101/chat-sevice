@@ -22,13 +22,6 @@ public class MessageController {
      * 2. 어차피 개인방도 챗룸을 가진다.
      */
 
-
-    // TODO : /api/v1/messages/{receiverId} ??
-    /**
-     * 1. receiverId 를 받아야하나?
-     * 2. 챗 Id에 보낸다면? -> 개인은 그냥 받는 느낌, 단체는 다 받는 느낌
-     *
-     */
     @PostMapping("/api/v1/messages/{chatRoomId}")
     public void sendMessage(
             @CurrentUser UserPrincipal userPrincipal,
@@ -40,10 +33,23 @@ public class MessageController {
         messageService.sendMessage(message, senderUserId, chatRoomId);
     }
 
-    // 나에게 온 메시지를 들고오기 -> TODO readID? 확인하는 로직 넣기
-    @GetMapping("/api/v1/messages/{userId}")
-    public List<MessageResponse> getMessages(@PathVariable Long userId) {
-        return messageService.getMessages(userId);
+    // TODO 3 : 메시지를 불러오기
+    // 나에게 온 메시지를 들고오기 -> 이거는 따로 생각할 필요없이 한번에 다 불러와서 나눠주자
+
+    /**
+     * 프론트에서 좌, 우를 나눠서 표시해줌
+     * 왼쪽은 상대방 메시지, 오른쪽은 내메시지로 한다면?
+     * 메시지 조회했을 때 누가 보낸건지도 필요할 듯
+     */
+    // TODO readID? 확인하는 로직 넣기
+    @GetMapping("/api/v1/messages/{chatRoomId}")
+    public List<MessageResponse> getMessages(
+            @CurrentUser UserPrincipal userPrincipal,
+            @PathVariable Long chatRoomId) {
+
+        Long currentUserId = userPrincipal.getId();
+
+        return messageService.getMessages(currentUserId, chatRoomId);
     }
 
 }

@@ -25,24 +25,33 @@ public class ChatService {
     private final UserChatRepository userChatRepository;
 
     @Transactional
-    public void createChatRoom(ChatRequest chatRequest) {
+    public void createChatRoom(Long currentUserId, ChatRequest chatRequest) {
 
-        Chat chat = Chat.builder()
-                .name(chatRequest.getName())
-                .build();
-
+        Chat chat = new Chat();
         chatRepository.save(chat);
+
+        List<Long> participantIds = chatRequest.getUserId();
+        participantIds.add(currentUserId);
+
+        for (Long userId : participantIds) {
+            UserChat userChat = UserChat.builder()
+                    .chat(chat)
+                    .user(userRepository.findById(userId).get())
+                    .build();
+            userChatRepository.save(userChat);
+        }
+
     }
 
 
-    public List<ChatResponse> getChatRooms() {
+    public List<ChatResponse> getChatRooms(Long currentUserId) {
         List<ChatResponse> chatResponses = new ArrayList<>();
         List<Chat> chats = chatRepository.findAll();
 
-        for (Chat chat : chats) {
-            ChatResponse chatResponse = new ChatResponse(chat.getName());
-            chatResponses.add(chatResponse);
-        }
+//        for (Chat chat : chats) {
+//            ChatResponse chatResponse = new ChatResponse(chat.getName());
+//            chatResponses.add(chatResponse);
+//        }
 
         return chatResponses;
     }
@@ -81,7 +90,6 @@ public class ChatService {
     public void sendMessage(Long chatId, MessageRequest messageRequest, Long currentUserId) {
         User user = userRepository.findById(currentUserId).orElseThrow();
         Chat chat = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
-
 
 //        Message.builder()
 

@@ -7,6 +7,7 @@ import lombok.Getter;
 @Getter
 public class MessageResponse {
 
+    private Long senderId;
     private String message;
 
 }

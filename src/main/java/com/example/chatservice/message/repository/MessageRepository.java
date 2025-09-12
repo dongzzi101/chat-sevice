@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
-    List<Message> findAllByReceiverId(Long id);
+    List<Message> findByChatRoomId(Long chatRoomId);
 
 
 }
