@@ -42,7 +42,22 @@ public class LoginCheckInterceptor implements HandlerInterceptor {
     }
 }
 // TODO 사진 s3
-//
+// TODO 3 : 이미지 저장
+// S3 flow
+/**
+ * 1. s3Service.uploadFile()
+ * 2. String imageUrls = s3Service.uploadFile("posts", images);
+ * 3. Message.builder()
+ *           .sender(senderUser)
+ *           .chatRoom(chatRoom)
+ *           .message(messageRequest.getMessage())
+ *           .imageUrl(imageUrls)
+ *           .build();
+ * 4. 메시지 조회 시 url 나오면 이건 -> 클라이언트가 s3에서 받아오는 것!
+ *
+ */
+
+
 
 
 // send message

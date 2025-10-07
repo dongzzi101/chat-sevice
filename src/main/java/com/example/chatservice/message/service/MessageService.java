@@ -50,7 +50,7 @@ public class MessageService {
     public List<MessageResponse> getMessages(Long currentUserId, Long chatRoomId) {
         List<MessageResponse> messageResponses = new ArrayList<>();
 
-        List<Message> messages = messageRepository.findByChatRoomId(chatRoomId);
+        List<Message> messages = messageRepository.findByChatRoomIdOrderByCreatedAtDesc(chatRoomId);
 
         for (Message message : messages) {
             MessageResponse messageResponse = new MessageResponse(message.getSender().getId(), message.getMessage());

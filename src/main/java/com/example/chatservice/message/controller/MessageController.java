@@ -22,6 +22,7 @@ public class MessageController {
      * 2. 어차피 개인방도 챗룸을 가진다.
      */
 
+    // TODO 4 : 대화방이 있는지 확인 로직
     @PostMapping("/api/v1/messages/{chatRoomId}")
     public void sendMessage(
             @CurrentUser UserPrincipal userPrincipal,

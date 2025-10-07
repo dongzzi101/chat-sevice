@@ -33,6 +33,13 @@ public class ChatController {
      * 1. userId를 임의적으로 받아서 만든다 (하나만 받으면 개인, 여러개 받으면 단체 채팅방)
      */
 
+
+    /**
+     * 단체 메시지는 채팅방을 만들면서 참가자들 초대하는 로직이 이해가 됨
+     * 근데 1대1일 메시지에서는 채팅방 생성을 따로 하는 게 아니고
+     * 메시지를 보냄과 동시에 채팅방이 만들어 지는 건가?
+     */
+
     // 채팅방 만들기
     @PostMapping("/api/v1/chat")
     public void createChatRoom(@CurrentUser UserPrincipal userPrincipal, @RequestBody ChatRequest chatRequest) {

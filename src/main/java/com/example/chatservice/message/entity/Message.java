@@ -6,6 +6,9 @@ import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -30,17 +33,14 @@ public class Message {
     @ManyToOne(fetch = FetchType.LAZY)
     private Chat chatRoom;
 
+    @CreatedDate
+    private LocalDateTime createdAt;
+
     @Builder
     public Message(String message, User sender, Chat chatRoom) {
         this.message = message;
         this.sender = sender;
         this.chatRoom = chatRoom;
+        this.createdAt = LocalDateTime.now();
     }
-
-    // TODO
-    /*
-    Message.receiver 제거
-    1:1 개인톡도 Chat 테이블에 채팅방 생성
-    모든 메시지는 sender + chatRoom으로 저장 및 조회
-     */
 }
