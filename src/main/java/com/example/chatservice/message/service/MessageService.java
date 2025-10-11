@@ -1,6 +1,6 @@
 package com.example.chatservice.message.service;
 
-import com.example.chatservice.chat.entity.Chat;
+import com.example.chatservice.chat.entity.ChatRoom;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.controller.response.MessageResponse;
@@ -26,7 +26,7 @@ public class MessageService {
     @Transactional
     public void sendMessage(MessageRequest messageRequest, Long senderUserId, Long chatRoomId) {
         User senderUser = userRepository.findById(senderUserId).orElseThrow();
-        Chat chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
 
         // TODO 3 : 근데 메시지 저장이 하나만 되는게 맞겠죠? 중요도 낮음
         /**

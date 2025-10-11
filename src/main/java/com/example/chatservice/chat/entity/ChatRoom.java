@@ -1,9 +1,7 @@
 package com.example.chatservice.chat.entity;
 
 
-import com.example.chatservice.user.entity.User;
 import jakarta.persistence.*;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -13,7 +11,7 @@ import java.util.List;
 @Getter
 @NoArgsConstructor
 @Table(name = "chats")
-public class Chat {
+public class ChatRoom {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

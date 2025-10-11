@@ -1,13 +1,11 @@
 package com.example.chatservice.user.entity;
 
-import com.example.chatservice.chat.entity.Chat;
 import com.example.chatservice.chat.entity.UserChat;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Entity

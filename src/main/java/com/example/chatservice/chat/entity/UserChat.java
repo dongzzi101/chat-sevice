@@ -22,12 +22,12 @@ public class UserChat {
 
     @ManyToOne
     @JoinColumn(name = "chat_id")
-    private Chat chat;
+    private ChatRoom chatRoom;
 
     @Builder
-    public UserChat(User user, Chat chat) {
+    public UserChat(User user, ChatRoom chatRoom) {
         this.user = user;
-        this.chat = chat;
+        this.chatRoom = chatRoom;
     }
 
 }

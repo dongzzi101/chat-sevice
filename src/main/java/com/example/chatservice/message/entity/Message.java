@@ -1,6 +1,6 @@
 package com.example.chatservice.message.entity;
 
-import com.example.chatservice.chat.entity.Chat;
+import com.example.chatservice.chat.entity.ChatRoom;
 import com.example.chatservice.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Builder;
@@ -31,13 +31,13 @@ public class Message {
 //    private User receiver;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    private Chat chatRoom;
+    private ChatRoom chatRoom;
 
     @CreatedDate
     private LocalDateTime createdAt;
 
     @Builder
-    public Message(String message, User sender, Chat chatRoom) {
+    public Message(String message, User sender, ChatRoom chatRoom) {
         this.message = message;
         this.sender = sender;
         this.chatRoom = chatRoom;
