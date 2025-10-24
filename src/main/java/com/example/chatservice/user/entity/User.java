@@ -20,8 +20,8 @@ public class User {
 
     private String username;
 
-    @OneToMany(mappedBy = "user")
-    private List<UserChat> userChats;
+//    @OneToMany(mappedBy = "user")
+//    private List<UserChat> userChats;
 
     @Builder
     public User(String username) {

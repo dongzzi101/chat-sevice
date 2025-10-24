@@ -7,6 +7,6 @@ import java.util.List;
 @Getter
 public class ChatRequest {
 
-//    private String name;
-    private List<Long> userId;
+    private List<Long> userIds;
+
 }

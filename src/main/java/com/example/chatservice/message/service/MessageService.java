@@ -1,7 +1,9 @@
 package com.example.chatservice.message.service;
 
 import com.example.chatservice.chat.entity.ChatRoom;
+import com.example.chatservice.chat.entity.ReadStatus;
 import com.example.chatservice.chat.repository.ChatRepository;
+import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.entity.Message;
@@ -22,6 +24,7 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final ChatRepository chatRepository;
+    private final ReadStatusRepository readStatusRepository;
 
     @Transactional
     public void sendMessage(MessageRequest messageRequest, Long senderUserId, Long chatRoomId) {
@@ -44,17 +47,38 @@ public class MessageService {
                 .message(messageRequest.getMessage())
                 .build();
 
+        //TODO:FLOW - 6. 메시지 전송 후 read_status 상태를 업데이트 해야 함
+        ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
+
         messageRepository.save(message);
+
+        senderReadStatus.updateReadMessage(message);
     }
 
+    @Transactional
     public List<MessageResponse> getMessages(Long currentUserId, Long chatRoomId) {
+        User currentUser = userRepository.findById(currentUserId).orElseThrow();
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
+
+        List<Message> messages = messageRepository
+                .findByChatRoomIdOrderByCreatedAtDesc(chatRoomId);
+
+        //TODO:FLOW - 7. 메시지를 읽으면 read_status 어디까지 읽었는지 업데이트
+        if (!messages.isEmpty()) {
+            Message latestMessage = messages.get(0);
+
+            ReadStatus userReadStatus = readStatusRepository
+                    .findByUserAndChatRoom(currentUser, chatRoom);
+
+            userReadStatus.updateReadMessage(latestMessage);
+        }
+
         List<MessageResponse> messageResponses = new ArrayList<>();
-
-        List<Message> messages = messageRepository.findByChatRoomIdOrderByCreatedAtDesc(chatRoomId);
-
         for (Message message : messages) {
-            MessageResponse messageResponse = new MessageResponse(message.getSender().getId(), message.getMessage());
-            messageResponses.add(messageResponse);
+            messageResponses.add(new MessageResponse(
+                    message.getSender().getId(),
+                    message.getMessage()
+            ));
         }
 
         return messageResponses;

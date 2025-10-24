@@ -23,6 +23,8 @@ public class MessageController {
      */
 
     // TODO 4 : 대화방이 있는지 확인 로직
+
+    // TODO:FLOW - 5. 메시지를 /api/v1/messages/{chatRoomId}로 전송
     @PostMapping("/api/v1/messages/{chatRoomId}")
     public void sendMessage(
             @CurrentUser UserPrincipal userPrincipal,

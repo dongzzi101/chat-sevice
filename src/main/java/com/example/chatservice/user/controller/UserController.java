@@ -4,14 +4,17 @@ import com.example.chatservice.user.controller.request.UserCreateRequest;
 import com.example.chatservice.user.controller.request.UserLoginRequest;
 import com.example.chatservice.user.controller.response.UserCreateResponse;
 import com.example.chatservice.user.controller.response.UserLoginResponse;
+import com.example.chatservice.user.controller.response.UserResponse;
 import com.example.chatservice.user.service.UserService;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -29,6 +32,13 @@ public class UserController {
     public UserLoginResponse loginUser(@RequestBody UserLoginRequest userLoginRequest) {
         UserLoginResponse userLoginResponse = userService.login(userLoginRequest);
         return userLoginResponse;
+    }
+
+    // TODO:FLOW - 1. 사용자 목록을 보여줌
+    @GetMapping("/api/v1/users")
+    public List<UserResponse> getUsers() {
+        List<UserResponse> users = userService.getUsers();
+        return users;
     }
 }
 //TODO 2 : jwt flow 정리

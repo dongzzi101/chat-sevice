@@ -2,6 +2,7 @@ package com.example.chatservice.chat.controller;
 
 import com.example.chatservice.chat.controller.request.ChatRequest;
 import com.example.chatservice.chat.controller.request.ChatResponse;
+import com.example.chatservice.chat.controller.request.ChatRoomResponse;
 import com.example.chatservice.chat.sercivce.ChatService;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.user.CurrentUser;
@@ -41,18 +42,21 @@ public class ChatController {
      */
 
     // 채팅방 만들기
+    // TODO:FLOW - 2.사용자A 가 친구A한테 메시지를 보낸다고 가정
     @PostMapping("/api/v1/chat")
-    public void createChatRoom(@CurrentUser UserPrincipal userPrincipal, @RequestBody ChatRequest chatRequest) {
+    public ChatResponse createChatRoom(@CurrentUser UserPrincipal userPrincipal, @RequestBody ChatRequest chatRequest) {
         Long id = userPrincipal.getId();
-        chatService.createChatRoom(id, chatRequest);
+        ChatResponse chatRoom = chatService.createChatRoom(id, chatRequest);
+        return chatRoom;
     }
 
     // 내 채팅방 리스트 조회
     @GetMapping("/api/v1/chats")
-    public List<ChatResponse> getChatRooms(@CurrentUser UserPrincipal userPrincipal) {
+    // TODO:FLOW 내 채팅방 리스트 조회(GET /api/v1/chats)
+    public List<ChatRoomResponse> getChatRooms(@CurrentUser UserPrincipal userPrincipal) {
         Long currentUserId = userPrincipal.getId();
-        List<ChatResponse> chatResponses = chatService.getChatRooms(currentUserId);
-        return chatResponses;
+        List<ChatRoomResponse> ChatRoomResponse = chatService.getChatRooms(currentUserId);
+        return ChatRoomResponse;
     }
 
     // 채팅방 가입
@@ -67,6 +71,7 @@ public class ChatController {
     @DeleteMapping("/api/v1/chat/{chatId}")
     public void leaveChat(@CurrentUser UserPrincipal userPrincipal, @PathVariable Long chatId) {
         Long currentUserId = userPrincipal.getId();
+        // TODO : update chat_key
         chatService.leaveChatRoom(chatId, currentUserId);
     }
 
@@ -78,9 +83,6 @@ public class ChatController {
         chatService.sendMessage(chatId, messageRequest, currentUserId);
     }
 
-
-    // 채팅방? 에서 메시지 조회
-//    @GetMapping("/api/v1/chats/{chatId}")
 
 
 }
