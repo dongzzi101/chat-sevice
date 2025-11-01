@@ -35,4 +35,8 @@ public class ChatRoom {
         this.type =  type;
         this.chatKey = chatKey;
     }
+
+    public void updateChatKey(String chatKey) {
+        this.chatKey = chatKey;
+    }
 }

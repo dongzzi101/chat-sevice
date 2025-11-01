@@ -16,6 +16,8 @@ public interface UserChatRepository extends JpaRepository<UserChat, Long> {
 
     void deleteByUserAndChatRoom(User user, ChatRoom chatRoom);
 
+    Optional<UserChat> findByUserAndChatRoom(User user, ChatRoom chatRoom);
+
     @Query("SELECT uc.chatRoom FROM UserChat uc WHERE uc.user.id IN :userIds AND uc.chatRoom.type = 'DIRECT' GROUP BY uc.chatRoom HAVING COUNT(DISTINCT uc.user.id) = 2")
     Optional<ChatRoom> findDirectChatRoomByUserIds(@Param("userIds") List<Long> userIds);
     // chat entity

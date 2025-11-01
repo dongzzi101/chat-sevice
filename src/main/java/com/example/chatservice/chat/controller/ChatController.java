@@ -7,9 +7,7 @@ import com.example.chatservice.chat.sercivce.ChatService;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.user.CurrentUser;
 import com.example.chatservice.user.UserPrincipal;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -68,11 +66,11 @@ public class ChatController {
 
 
     // 채팅방 나가기
-    @DeleteMapping("/api/v1/chat/{chatId}")
-    public void leaveChat(@CurrentUser UserPrincipal userPrincipal, @PathVariable Long chatId) {
+    @DeleteMapping("/api/v1/chat/{chatRoomId}")
+    public void leaveChat(@CurrentUser UserPrincipal userPrincipal, @PathVariable Long chatRoomId) {
         Long currentUserId = userPrincipal.getId();
         // TODO : update chat_key
-        chatService.leaveChatRoom(chatId, currentUserId);
+        chatService.leaveChatRoom(chatRoomId, currentUserId);
     }
 
     // 채팅방? 에서 메시지 전송

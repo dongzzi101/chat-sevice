@@ -19,9 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -55,14 +53,21 @@ public class ChatService {
 
             String chatKey = createChatKey(userIds);
 
+            boolean isSelfChat = userIds.get(0).equals(userIds.get(1));
+
+            ChatType chatType = isSelfChat ? ChatType.IM :
+                    (userIds.size() == 2 ? ChatType.DIRECT : ChatType.GROUP);
+
             chatRoom = ChatRoom.builder()
-                    .type(userIds.size() == 2 ? ChatType.DIRECT : ChatType.GROUP)
+                    .type(chatType)
                     .chatKey(chatKey)
                     .build();
 
             chatRepository.save(chatRoom);
 
-            for (Long userId : userIds) {
+            Set<Long> uniqueUserIds = new HashSet<>(userIds);
+
+            for (Long userId : uniqueUserIds) {
                 UserChat userChat = UserChat.builder()
                         .chatRoom(chatRoom)
                         .user(userRepository.findById(userId).get())
@@ -170,11 +175,40 @@ public class ChatService {
     // public String test(){}
 
     @Transactional
-    public void leaveChatRoom(Long chatId, Long currentUserId) {
+    public void leaveChatRoom(Long chatRoomId, Long currentUserId) {
         User user = userRepository.findById(currentUserId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
 
-        userChatRepository.deleteByUserAndChatRoom(user, chatRoom);
+        UserChat userChat = userChatRepository.findByUserAndChatRoom(user, chatRoom)
+                .orElseThrow(() -> new RuntimeException("채팅방에 참여하지 않음"));
+
+        userChat.leaveChatRoom();
+
+        // TODO 여기부분 공부
+        List<UserChat> activeUserChats = chatRoom.getUserChats().stream()
+                .filter(uc -> uc.getLeavedAt() == null)
+                .toList();
+
+        Set<Long> activeUserIds = activeUserChats.stream()
+                .map(uc -> uc.getUser().getId())
+                .collect(Collectors.toSet());
+
+        String chatKey = createChatKey(new ArrayList<>(activeUserIds));
+        chatRoom.updateChatKey(chatKey);
+
+/*
+        List<UserChat> userChats = chatRoom.getUserChats();
+
+        Set<Long> uniqueUserIds = new HashSet<>();
+
+        for (UserChat chat : userChats) {
+            uniqueUserIds.add(chat.getUser().getId());
+        }
+
+        String chatKey = createChatKey(new ArrayList<>(uniqueUserIds));
+        chatRoom.updateChatKey(chatKey);
+*/
+
     }
 
     @Transactional

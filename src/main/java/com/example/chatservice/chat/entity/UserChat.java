@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @NoArgsConstructor
@@ -24,6 +26,8 @@ public class UserChat{
     @JoinColumn(name = "chat_id")
     private ChatRoom chatRoom;
 
+    private LocalDateTime leavedAt;
+
     // private lastSeenMessageId // or lastSeenMessageTime
 
     // 유저별로 채팅방에 마지막 메시지가 다른가? -> 똑같을 듯?
@@ -37,6 +41,10 @@ public class UserChat{
     public UserChat(User user, ChatRoom chatRoom) {
         this.user = user;
         this.chatRoom = chatRoom;
+    }
+
+    public void leaveChatRoom() {
+        this.leavedAt = LocalDateTime.now();
     }
 
 }
