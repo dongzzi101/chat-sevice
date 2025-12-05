@@ -9,17 +9,40 @@ import com.example.chatservice.user.controller.response.UserResponse;
 import com.example.chatservice.user.entity.User;
 import com.example.chatservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
-public class UserService {
+public class UserService { // UserServiceCGlibSpringProxyTx
 
     private final UserRepository userRepository;
+//    private final RedisTemplate<Object, Object> redisTemplate;
+
+//    public void test(){
+//        List<User> users = ...;
+//
+//        List<User> otherUsers = ...;
+//        if(otherUsers) {
+//            // condition == true
+//            users.add(otherUser[0]);
+//            users.add(otherUser[1]);
+//        }
+//
+//        // state -> changed
+//        List<Integer> numbers = List.of(1, 2, 3);
+//        Stream<Integer> stream = numbers.stream()
+//                .filter(n -> n % 2 == 0);
+//
+//
+//        // immutable
+//        List<User> newUsers = users.map(...filter...);
+//    }
 
     @Transactional
     public UserCreateResponse createUser(UserCreateRequest createRequest) {
@@ -68,4 +91,15 @@ public class UserService {
 
         return userResponses;
     }
+
+//    public void getUser(Long userId){
+//        User user = redisTemplate.get(userId); // look aside
+//        if(user == null){
+//            user = userRepository.findById(userId);
+//            redisTemplate.set(userId, user); // lazy loading
+//            return user;
+//        } else {
+//            return user;
+//        }
+//    }
 }

@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 public class Message {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+//    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String message;
@@ -37,7 +37,8 @@ public class Message {
     private LocalDateTime createdAt;
 
     @Builder
-    public Message(String message, User sender, ChatRoom chatRoom) {
+    public Message(Long id, String message, User sender, ChatRoom chatRoom) {
+        this.id = id;
         this.message = message;
         this.sender = sender;
         this.chatRoom = chatRoom;

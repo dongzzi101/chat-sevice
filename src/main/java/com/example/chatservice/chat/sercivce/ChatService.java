@@ -10,11 +10,13 @@ import com.example.chatservice.chat.entity.UserChat;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
+import com.example.chatservice.exception.UserNotJoinedException;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.repository.MessageRepository;
 import com.example.chatservice.user.entity.User;
 import com.example.chatservice.user.repository.UserRepository;
+import com.sun.jdi.InvalidCodeIndexException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -86,7 +88,6 @@ public class ChatService {
         }
 
         return new ChatResponse(chatRoom.getId(), chatRoom.getType());
-
     }
 
     private ChatRoom findExistChatRoom(List<Long> userIds) {
@@ -123,20 +124,44 @@ public class ChatService {
         List<ChatRoomResponse> chatroomResponses = new ArrayList<>();
 
         List<UserChat> userChatList = userChatRepository.findByUserId(currentUserId);
-
+        User currentUser = userRepository.findById(currentUserId).orElseThrow();
 
         for (UserChat userChat : userChatList) {
 
             ChatRoom chatRoom = userChat.getChatRoom();
-
+            // TODO : 뭐지?
+            // 1. 채팅방의 마지막 메시지 가져오기
             Message lastMessage = messageRepository
-                    // TODO : 여기부분 공부하기
-                    .findTopByChatRoomIdOrderByCreatedAtDesc(chatRoom.getId())
+                    .findTopByChatRoomIdOrderByIdDesc(chatRoom.getId())
                     .orElse(null);
 
+//            Message lastMessage = messageRepository
+//                    .findTopByChatRoomIdOrderByCreatedAtDesc(chatRoom.getId())
+//                    .orElse(null);
+
+            // 2. 내가 마지막으로 읽은 메시지 정보 가져오기 -> 안읽은 메시지 수 개산하려고
+            ReadStatus myReadStatus = readStatusRepository
+                    .findByUserAndChatRoom(currentUser, chatRoom);
+
+            // 3. 안읽은 메시지 개수 계산
+            long unreadCount = 0;
+            if (myReadStatus != null && myReadStatus.getLastReadMessage() != null) {
+                // 내가 읽은 메시지 이후의 메시지 개수
+                unreadCount = messageRepository.countByChatRoomIdAndIdGreaterThan(
+                        chatRoom.getId(),
+                        myReadStatus.getLastReadMessage().getId()
+                );
+            } else if (lastMessage != null) {
+                // ReadStatus가 없거나 한 번도 안 읽었으면 전체 메시지가 안읽음
+                unreadCount = messageRepository.countByChatRoomId(chatRoom.getId());
+            }
+
             ChatRoomResponse response = ChatRoomResponse.builder()
-                    .lastMessage(lastMessage.getMessage())
-                    .lastMessageDateTime(lastMessage.getCreatedAt())
+                    .chatRoomId(chatRoom.getId())
+                    .lastMessage(lastMessage != null ? lastMessage.getMessage() : null)
+                    .lastMessageDateTime(lastMessage != null ? lastMessage.getCreatedAt() : null)
+                    .lastMessageId(lastMessage != null ? lastMessage.getId() : null)
+                    .unreadCount(unreadCount)
                     .build();
 
             chatroomResponses.add(response);
@@ -144,14 +169,22 @@ public class ChatService {
 
         // TODO : 여기부분 공부하기
         chatroomResponses.sort((a, b) -> {
-            if (a.getLastMessageDateTime() == null) return 1;
-            if (b.getLastMessageDateTime() == null) return -1;
-            return b.getLastMessageDateTime().compareTo(a.getLastMessageDateTime());
+            if (a.getLastMessageId() == null) return 1;
+            if (b.getLastMessageId() == null) return -1;
+            return b.getLastMessageId().compareTo(a.getLastMessageId());  // ID 비교!
         });
+
+
+//        chatroomResponses.sort((a, b) -> {
+//            if (a.getLastMessageDateTime() == null) return 1;
+//            if (b.getLastMessageDateTime() == null) return -1;
+//            return b.getLastMessageDateTime().compareTo(a.getLastMessageDateTime());
+//        });
 
         return chatroomResponses;
     }
 
+    @Transactional
     public void joinChatRoom(Long chatId, Long userId) {
 
         User user = userRepository.findById(userId).orElseThrow();
@@ -169,6 +202,17 @@ public class ChatService {
                 .build();
 
         userChatRepository.save(userChat);
+        
+        // ReadStatus도 생성 (채팅방 참여 시 읽음 상태 초기화)
+        ReadStatus existingReadStatus = readStatusRepository.findByUserAndChatRoom(user, chatRoom);
+        if (existingReadStatus == null) {
+            ReadStatus readStatus = ReadStatus.builder()
+                    .user(user)
+                    .chatRoom(chatRoom)
+                    .lastReadMessage(null)
+                    .build();
+            readStatusRepository.save(readStatus);
+        }
     }
 
     // @ExceptionHandler(RuntimeException.class)
@@ -212,12 +256,25 @@ public class ChatService {
     }
 
     @Transactional
-    public void sendMessage(Long chatId, MessageRequest messageRequest, Long currentUserId) {
+    public void sendMessage(Long chatId, MessageRequest messageRequest, Long currentUserId) throws UserNotJoinedException {
         User user = userRepository.findById(currentUserId).orElseThrow();
         ChatRoom chatRoom = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
+
+        // if(true)
+        throw new UserNotJoinedException();
 
 //        Message.builder()
 
 
     }
 }
+
+
+/*
+1. userchat paging 30개? (제일 최근에 메시지가 발생한 채팅방부터 30개) (최근에 가장 구매가 많았던 상품부터 30개) (별도의 정렬조건들...)
+createad id ...
+
+2. 해당하는 message 조회(지금은 단건씨 조회하지만, 제가 배치로 묶어서 하자... 성능)
+
+3. message time 보고 user chat을 다시 내가 원하는대로 정렬해준다...
+* */

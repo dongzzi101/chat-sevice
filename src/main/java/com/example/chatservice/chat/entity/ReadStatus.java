@@ -5,9 +5,11 @@ import com.example.chatservice.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
+@Getter
 @NoArgsConstructor
 @Table(name = "read_status")
 public class ReadStatus {

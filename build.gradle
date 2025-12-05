@@ -37,6 +37,22 @@ dependencies {
 
     // HASHING
     implementation 'org.springframework.security:spring-security-core:5.8.3'
+
+    // redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // web socket
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // actuator
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // datadog trace span
+    implementation("com.datadoghq:dd-trace-api:1.56.1")
+    implementation("io.opentracing:opentracing-api:0.33.0")
+    implementation("io.opentracing:opentracing-util:0.33.0")
+
 }
 
 tasks.named('test') {

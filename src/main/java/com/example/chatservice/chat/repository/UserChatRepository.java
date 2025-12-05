@@ -38,4 +38,12 @@ public interface UserChatRepository extends JpaRepository<UserChat, Long> {
     Optional<ChatRoom> findGroupChatRoomByUserIds(@Param("userIds") List<Long> userIds, @Param("userCount") long userCount);
 
     List<UserChat> findByUserId(Long userId);
+    
+    // 채팅방에 참여한 모든 유저 조회 (나간 유저 제외) n+1 문제 발생
+    @Query("SELECT uc FROM UserChat uc WHERE uc.chatRoom.id = :chatRoomId AND uc.leavedAt IS NULL")
+    List<UserChat> findByChatRoomIdAndLeavedAtIsNull(@Param("chatRoomId") Long chatRoomId);
+
+    @Query("SELECT uc FROM UserChat uc JOIN FETCH uc.user WHERE uc.chatRoom.id = :chatRoomId AND uc.leavedAt IS NULL")
+    List<UserChat> findActiveByChatRoomWithUser(@Param("chatRoomId") Long chatRoomId);
+
 }

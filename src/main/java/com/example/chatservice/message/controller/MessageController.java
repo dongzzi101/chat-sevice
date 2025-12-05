@@ -34,6 +34,8 @@ public class MessageController {
         Long senderUserId = userPrincipal.getId();
 
         messageService.sendMessage(message, senderUserId, chatRoomId);
+
+        // relay
     }
 
     // TODO 3 : 메시지를 불러오기
@@ -48,11 +50,13 @@ public class MessageController {
     @GetMapping("/api/v1/messages/{chatRoomId}")
     public List<MessageResponse> getMessages(
             @CurrentUser UserPrincipal userPrincipal,
-            @PathVariable Long chatRoomId) {
-
+            @PathVariable Long chatRoomId,
+            @RequestParam(required = false) Long lastReadMessageId,
+            @RequestParam(defaultValue = "3") int before,
+            @RequestParam(defaultValue = "3") int after
+    ) {
         Long currentUserId = userPrincipal.getId();
-
-        return messageService.getMessages(currentUserId, chatRoomId);
+        return messageService.getMessages(currentUserId, chatRoomId, lastReadMessageId, before, after);
     }
 
 }
