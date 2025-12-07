@@ -58,6 +58,8 @@ public class InternalMessageController {
      * 다른 서버에서 배치로 메시지를 전달받는 엔드포인트 (여러 유저)
      * 예: 8080 서버에서 8081 서버로 200명의 유저에게 메시지 전달
      */
+
+    /// TODO  post 요청을 /internal/message 에서는 250번 보낼때 이걸써서 한번에 보내겟다는 뜻인가?
     @PostMapping("/internal/message/batch")
     public void receiveMessageBatch(@RequestBody Map<String, Object> request) {
         try {

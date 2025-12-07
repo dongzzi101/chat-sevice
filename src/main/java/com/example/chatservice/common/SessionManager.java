@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SessionManager {
 
     private final Map<Long, WebSocketSession> userSessions = new ConcurrentHashMap<>();
+    private final Map<Long, Object> sessionLocks = new ConcurrentHashMap<>();  // WebSocket 전송 동기화용
 
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
@@ -28,6 +29,7 @@ public class SessionManager {
     public void addSession(Long userId, WebSocketSession session) {
         try {
             userSessions.put(userId, session);
+            sessionLocks.putIfAbsent(userId, new Object());  // 동기화용 lock 생성
 
             // Redis에 저장: user:{userId} -> serverAddress
             String serverAddress = serverInfoProvider.getServerAddress();
@@ -49,6 +51,7 @@ public class SessionManager {
 
     public void removeSession(Long userId) {
         userSessions.remove(userId);
+        sessionLocks.remove(userId);  // lock도 함께 제거
         redisTemplate.delete("user:" + userId);
 
         log.info("User {} disconnected. Total sessions: {}", userId, userSessions.size());
@@ -56,14 +59,18 @@ public class SessionManager {
 
     public void sendToUser(Long userId, Object message) {
         WebSocketSession session = userSessions.get(userId);
+        Object lock = sessionLocks.get(userId);
 
-        if (session != null && session.isOpen()) {
-            try {
-                String jsonMessage = objectMapper.writeValueAsString(message);
-                session.sendMessage(new TextMessage(jsonMessage));
-                log.info("Message sent to user {}: {}", userId, jsonMessage);
-            } catch (IOException e) {
-                log.error("Failed to send message to user {}", userId, e);
+        if (session != null && session.isOpen() && lock != null) {
+            // WebSocket sendMessage()는 thread-safe하지 않으므로 동기화 필요
+            synchronized (lock) {
+                try {
+                    String jsonMessage = objectMapper.writeValueAsString(message);
+                    session.sendMessage(new TextMessage(jsonMessage));
+                    log.info("Message sent to user {}: {}", userId, jsonMessage);
+                } catch (IOException e) {
+                    log.error("Failed to send message to user {}", userId, e);
+                }
             }
         } else {
             log.warn("User {} session not found or closed", userId);

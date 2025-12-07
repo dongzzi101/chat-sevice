@@ -44,7 +44,9 @@ public class ChatController {
     @PostMapping("/api/v1/chat")
     public ChatResponse createChatRoom(@CurrentUser UserPrincipal userPrincipal, @RequestBody ChatRequest chatRequest) {
         Long id = userPrincipal.getId();
+        // 95% 유저는 원래 service 사용
         ChatResponse chatRoom = chatService.createChatRoom(id, chatRequest);
+        // 5%  유저는 newChatService.createChatRoomV2();
         return chatRoom;
     }
 
