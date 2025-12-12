@@ -75,14 +75,6 @@ public class ChatController {
         chatService.leaveChatRoom(chatRoomId, currentUserId);
     }
 
-    // 채팅방? 에서 메시지 전송
-    @PostMapping("/api/v1/chats/{chatId}")
-    public void sendMessage(@CurrentUser UserPrincipal userPrincipal, @PathVariable Long chatId, @RequestBody MessageRequest messageRequest) {
-        // httrequest or httpattributye . get("userId")
-        Long currentUserId = userPrincipal.getId();
-        chatService.sendMessage(chatId, messageRequest, currentUserId);
-    }
-
 
 
 }

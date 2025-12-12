@@ -179,7 +179,6 @@ public class MessageDeliveryService {
     }
 
     /**
-     * 서버 주소를 정규화합니다.
      * 127.0.0.1:8080 -> localhost:8080로 변환하거나 그대로 유지
      */
     private String normalizeServerAddress(String serverAddress) {

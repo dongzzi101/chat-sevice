@@ -142,126 +142,6 @@ public class MessageService {
 //        MessageDto.from(message);
     }
 
-
-    /*@Transactional
-    public void sendMessageViaWebSocket(Long senderId, Long receiverId, Long chatRoomId, String content) {
-        log.info("Sending message from {} in chatRoom {}", senderId, chatRoomId);
-
-        // 1. User, ChatRoom 조회
-        User senderUser = userRepository.findById(senderId)
-                .orElseThrow(() -> new IllegalArgumentException("Sender not found"));
-        ChatRoom chatRoom = chatRepository.findById(chatRoomId)
-                .orElseThrow(() -> new IllegalArgumentException("ChatRoom not found"));
-
-        // 2. DB에 메시지 저장
-        Message message = Message.builder()
-                .id(snowflake.nextId())
-                .sender(senderUser)
-                .chatRoom(chatRoom)
-                .message(content)
-                .build();
-
-        messageRepository.saveAndFlush(message);
-        log.info("Message saved to DB: id={}", message.getId());
-
-        // 3. ReadStatus 업데이트 (발신자)
-        ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
-        senderReadStatus.updateReadMessage(message);
-
-        // 4. 실시간 전송
-        // receiverId가 있으면 1:1 채팅, 없으면 그룹 채팅 (채팅방 참여자 모두에게 전송)
-        if (receiverId != null) {
-            // 1:1 채팅 - 특정 수신자에게만 전송
-            deliverMessage(receiverId, message);
-        } else {
-            // 그룹 채팅 - 채팅방 참여자 모두에게 전송 (본인 제외)
-            deliverMessageToChatRoom(senderId, chatRoom, message);
-        }
-    }*/
-    
-    /*private void deliverMessageToChatRoom(Long senderId, ChatRoom chatRoom, Message message) {
-        // 채팅방에 참여한 모든 유저 조회 (나간 유저 제외)
-        List<UserChat> userChats = userChatRepository.findByChatRoomIdAndLeavedAtIsNull(chatRoom.getId());
-        
-        log.info("Delivering message to {} participants in chatRoom {}", userChats.size(), chatRoom.getId());
-        
-        for (UserChat userChat : userChats) {
-            Long participantId = userChat.getUser().getId();
-            
-            // 본인은 제외
-            if (participantId.equals(senderId)) {
-                log.info("Skipping sender {} (self)", participantId);
-                continue;
-            }
-            
-            log.info("Attempting to deliver message to participant {}", participantId);
-            // 각 참여자에게 메시지 전송
-            deliverMessage(participantId, message);
-        }
-    }
-
-    private void deliverMessage(Long receiverId, Message message) {
-        // Redis에서 수신자 서버 찾기
-        String redisKey = "user:" + receiverId;
-        String targetServer = redisTemplate.opsForValue().get(redisKey);
-
-        log.info("Looking up user {} in Redis (key: {}), found server: {}", receiverId, redisKey, targetServer);
-
-        if (targetServer == null) {
-            log.warn("⚠User {} is offline (not found in Redis)", receiverId);
-            return;
-        }
-
-        // 현재 서버 주소
-        String currentServer = serverInfoProvider.getServerAddress();
-        log.info("Current server: {}, Target server: {}", currentServer, targetServer);
-
-        // 같은 서버에 있으면 바로 전송
-        if (targetServer.equals(currentServer)) {
-            log.info("User {} is on the same server. Sending directly.", receiverId);
-
-            Map<String, Object> messageData = new HashMap<>();
-            messageData.put("messageId", message.getId());
-            messageData.put("senderId", message.getSender().getId());
-            messageData.put("content", message.getMessage());
-            messageData.put("chatRoomId", message.getChatRoom().getId());
-            messageData.put("sentAt", message.getCreatedAt());
-
-            sessionManager.sendToUser(receiverId, messageData);
-            log.info("Message sent directly to user {}", receiverId);
-        } else {
-            // 다른 서버로 HTTP 전송
-            log.info("User {} is on different server {}. Forwarding via HTTP.", receiverId, targetServer);
-            forwardToOtherServer(targetServer, receiverId, message);
-        }
-    }
-
-    private void forwardToOtherServer(String targetServer, Long receiverId, Message message) {
-        try {
-            Map<String, Object> request = new HashMap<>();
-            request.put("receiverId", receiverId);
-            request.put("messageId", message.getId());
-            request.put("senderId", message.getSender().getId());
-            request.put("content", message.getMessage());
-            request.put("chatRoomId", message.getChatRoom().getId());
-            request.put("sentAt", message.getCreatedAt());
-
-            String url = "http://" + targetServer + "/internal/message";
-            log.info("Forwarding message to user {} via HTTP: {}", receiverId, url);
-            log.info("Request payload: {}", request);
-
-            restTemplate.postForObject(url, request, Void.class);
-            log.info("Message forwarded successfully to {} for user {}", targetServer, receiverId);
-
-        } catch (Exception e) {
-            log.error("Failed to forward message to {} for user {}", targetServer, receiverId, e);
-            log.error("Exception details: {}", e.getMessage());
-            if (e.getCause() != null) {
-                log.error("Caused by: {}", e.getCause().getMessage());
-            }
-        }
-    }*/
-
         @Transactional
         public List<MessageResponse> getMessages (
                 Long currentUserId,
@@ -329,7 +209,7 @@ public class MessageService {
                 allMessages.add(baseMessage);
             }
             allMessages.addAll(afterMessages);
-
+            //TODO:FLOW - 7. 메시지를 읽으면 read_status 어디까지 읽었는지 업데이트
             // 6. 읽음 처리: 채팅방의 최신 메시지로 업데이트
             Message latestMessageInChatRoom = messageRepository
                     .findTopByChatRoomIdOrderByIdDesc(chatRoomId)
@@ -370,37 +250,4 @@ public class MessageService {
             return messageResponses;
         }
 
-//    @Transactional
-//    public List<MessageResponse> getMessages(
-//            Long currentUserId,
-//            Long chatRoomId,
-//            Long lastReadMessageId,
-//            int before, int after
-//    ) {
-//        User currentUser = userRepository.findById(currentUserId).orElseThrow();
-//        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
-//
-//        List<Message> messages = messageRepository
-//                .findByChatRoomIdOrderByCreatedAtDesc(chatRoomId);
-//
-//        //TODO:FLOW - 7. 메시지를 읽으면 read_status 어디까지 읽었는지 업데이트
-//        if (!messages.isEmpty()) {
-//            Message latestMessage = messages.get(0);
-//
-//            ReadStatus userReadStatus = readStatusRepository
-//                    .findByUserAndChatRoom(currentUser, chatRoom);
-//
-//            userReadStatus.updateReadMessage(latestMessage);
-//        }
-//
-//        List<MessageResponse> messageResponses = new ArrayList<>();
-//        for (Message message : messages) {
-//            messageResponses.add(new MessageResponse(
-//                    message.getSender().getId(),
-//                    message.getMessage()
-//            ));
-//        }
-//
-//        return messageResponses;
-//    }
     }

@@ -94,12 +94,6 @@ public class ChatService {
         String chatKey = findChatKey(userIds);
         ChatRoom chatRoom = chatRepository.findChatRoomByChatKey(chatKey).orElse(null);
         return chatRoom;
-
-//        if (userIds.size() == 2) {
-//            return userChatRepository.findDirectChatRoomByUserIds(userIds).orElse(null);
-//        } else {
-//            return userChatRepository.findGroupChatRoomByUserIds(userIds, userIds.size()).orElse(null);
-//        }
     }
 
     // chat key 생성해주는 역할
@@ -135,10 +129,6 @@ public class ChatService {
                     .findTopByChatRoomIdOrderByIdDesc(chatRoom.getId())
                     .orElse(null);
 
-//            Message lastMessage = messageRepository
-//                    .findTopByChatRoomIdOrderByCreatedAtDesc(chatRoom.getId())
-//                    .orElse(null);
-
             // 2. 내가 마지막으로 읽은 메시지 정보 가져오기 -> 안읽은 메시지 수 개산하려고
             ReadStatus myReadStatus = readStatusRepository
                     .findByUserAndChatRoom(currentUser, chatRoom);
@@ -173,13 +163,6 @@ public class ChatService {
             if (b.getLastMessageId() == null) return -1;
             return b.getLastMessageId().compareTo(a.getLastMessageId());  // ID 비교!
         });
-
-
-//        chatroomResponses.sort((a, b) -> {
-//            if (a.getLastMessageDateTime() == null) return 1;
-//            if (b.getLastMessageDateTime() == null) return -1;
-//            return b.getLastMessageDateTime().compareTo(a.getLastMessageDateTime());
-//        });
 
         return chatroomResponses;
     }
@@ -239,32 +222,6 @@ public class ChatService {
 
         String chatKey = createChatKey(new ArrayList<>(activeUserIds));
         chatRoom.updateChatKey(chatKey);
-
-/*
-        List<UserChat> userChats = chatRoom.getUserChats();
-
-        Set<Long> uniqueUserIds = new HashSet<>();
-
-        for (UserChat chat : userChats) {
-            uniqueUserIds.add(chat.getUser().getId());
-        }
-
-        String chatKey = createChatKey(new ArrayList<>(uniqueUserIds));
-        chatRoom.updateChatKey(chatKey);
-*/
-
-    }
-
-    @Transactional
-    public void sendMessage(Long chatId, MessageRequest messageRequest, Long currentUserId) throws UserNotJoinedException {
-        User user = userRepository.findById(currentUserId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
-
-        // if(true)
-        throw new UserNotJoinedException();
-
-//        Message.builder()
-
 
     }
 }
