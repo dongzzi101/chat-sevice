@@ -1,9 +1,37 @@
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
 spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
   jpa:
     hibernate:
+      # ddl-auto: none
       ddl-auto: create
     show-sql: true
     properties:
       hibernate:
         format_sql: true
     database-platform: org.hibernate.dialect.MySQL8Dialect
+
+token:
+  secret-key: "SECRET"
+  refresh-secret-key: "REFRESH_SECRET"
+  token-time: 300
+  refresh-token-time: 300
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus"
+  metrics:
+    tags:
+      application: my-app
