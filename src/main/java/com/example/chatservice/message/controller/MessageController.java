@@ -34,7 +34,7 @@ public class MessageController {
         Long senderUserId = userPrincipal.getId();
 
         messageService.sendMessage(message, senderUserId, chatRoomId);
-
+        // 여기서 응답받고 메시지 뿌리기 가능할 듯
         // relay
     }
 

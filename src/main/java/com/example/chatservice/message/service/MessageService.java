@@ -112,7 +112,7 @@ public class MessageService {
         ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
         senderReadStatus.updateReadMessage(message);
 
-        // 4. 발신자 본인에게 즉시 전송 (동기) - UX를 위해
+        // 4. 발신자 본인에게 즉시 전송 (동기)
         log.info("Sending message to sender {} immediately", senderId);
         messageDeliveryService.deliverMessage(senderId, message);
 

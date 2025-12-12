@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -106,6 +107,77 @@ public class MessageDeliveryService {
         }
     }
     
+    /**
+     * 같은 서버에 있는 유저에게 로컬로 메시지 전송 (WebSocket)
+     */
+    public void deliverMessageLocally(Long receiverId, Message message) {
+        Map<String, Object> messageData = new HashMap<>();
+        messageData.put("messageId", message.getId());
+        messageData.put("senderId", message.getSender().getId());
+        messageData.put("content", message.getMessage());
+        messageData.put("chatRoomId", message.getChatRoom().getId());
+        messageData.put("sentAt", message.getCreatedAt());
+
+        sessionManager.sendToUser(receiverId, messageData);
+        log.info("Message sent locally to user {}", receiverId);
+    }
+
+    /**
+     * 다른 서버로 배치로 메시지 전송
+     * @param targetServer 대상 서버 주소 (예: localhost:8081)
+     * @param receiverIds 수신자 ID 목록
+     * @param message 전송할 메시지
+     */
+    public void deliverMessageBatch(String targetServer, List<Long> receiverIds, Message message) {
+        String serverAddress = normalizeServerAddress(targetServer);
+        
+        int maxRetries = 3;
+        int retryCount = 0;
+        boolean success = false;
+        
+        while (retryCount < maxRetries && !success) {
+            try {
+                Map<String, Object> request = new HashMap<>();
+                request.put("receiverIds", receiverIds);  // 배열로 전송
+                request.put("messageId", message.getId());
+                request.put("senderId", message.getSender().getId());
+                request.put("content", message.getMessage());
+                request.put("chatRoomId", message.getChatRoom().getId());
+                request.put("sentAt", message.getCreatedAt());
+
+                String url = "http://" + serverAddress + "/internal/message/batch";
+                
+                if (retryCount > 0) {
+                    log.warn("[BATCH] Retrying ({}/{}) to forward message to {} users via HTTP: {}", 
+                            retryCount, maxRetries, receiverIds.size(), url);
+                } else {
+                    log.info("[BATCH] Forwarding message to {} users via HTTP: {}", receiverIds.size(), url);
+                }
+
+                restTemplate.postForObject(url, request, Void.class);
+                log.info("[BATCH] Message forwarded successfully to {} for {} users", serverAddress, receiverIds.size());
+                success = true;
+
+            } catch (Exception e) {
+                retryCount++;
+                log.error("[BATCH] Failed to forward message to {} for {} users (attempt {}/{}): {}", 
+                        serverAddress, receiverIds.size(), retryCount, maxRetries, e.getMessage());
+                
+                if (retryCount < maxRetries) {
+                    try {
+                        Thread.sleep(100 * retryCount);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                } else {
+                    log.error("[BATCH] Failed to forward message after {} attempts to {} for {} users", 
+                            maxRetries, serverAddress, receiverIds.size(), e);
+                }
+            }
+        }
+    }
+
     /**
      * 서버 주소를 정규화합니다.
      * 127.0.0.1:8080 -> localhost:8080로 변환하거나 그대로 유지
