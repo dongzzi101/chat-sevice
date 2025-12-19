@@ -59,4 +59,15 @@ public class MessageController {
         return messageService.getMessages(currentUserId, chatRoomId, lastReadMessageId, before, after);
     }
 
+    @PostMapping("/api/v1/messages/{chatRoomId}/read")
+    public void readMessage(
+            @CurrentUser UserPrincipal userPrincipal,
+            @PathVariable Long chatRoomId,
+            @RequestParam(required = false) Long messageId
+    ) {
+        Long currentUserId = userPrincipal.getId();
+        messageService.markMessagesAsRead(currentUserId, chatRoomId, messageId);
+    }
+
+
 }

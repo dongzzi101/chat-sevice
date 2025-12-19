@@ -2,6 +2,7 @@ package com.example.chatservice.common.ws;
 
 import com.example.chatservice.common.SessionManager;
 import com.example.chatservice.message.service.MessageService;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -93,7 +94,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
                     receiverId = Long.valueOf(messageData.get("receiverId").toString());
                 }
                 
-            } catch (com.fasterxml.jackson.core.JsonParseException e) {
+            } catch (JsonParseException e) {
                 // JSON이 아닌 경우 - 일반 텍스트 메시지로 처리
                 log.info("Received plain text message from user {}: {}", senderId, payload);
                 content = payload;
@@ -107,6 +108,7 @@ public class WebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
+            //1번
             messageService.sendMessageViaWebSocket(senderId, receiverId, chatRoomId, content);
 
         } catch (Exception e) {

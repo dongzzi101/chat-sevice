@@ -123,7 +123,6 @@ public class ChatService {
         for (UserChat userChat : userChatList) {
 
             ChatRoom chatRoom = userChat.getChatRoom();
-            // TODO : 뭐지?
             // 1. 채팅방의 마지막 메시지 가져오기
             Message lastMessage = messageRepository
                     .findTopByChatRoomIdOrderByIdDesc(chatRoom.getId())
@@ -235,3 +234,22 @@ createad id ...
 
 3. message time 보고 user chat을 다시 내가 원하는대로 정렬해준다...
 * */
+
+/*
+11
+10
+9
+8
+7
+6
+5
+4
+3
+2
+1
+select * userchat order by id desc limit 10;
+
+select * messages in (2~11)
+
+
+*/

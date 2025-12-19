@@ -11,6 +11,8 @@ import com.example.chatservice.common.snowflake.Snowflake;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.entity.Message;
+import com.example.chatservice.message.event.ChatMessageEvent;
+import com.example.chatservice.message.kafka.ChatMessageProducer;
 import com.example.chatservice.message.repository.MessageRepository;
 import com.example.chatservice.user.entity.User;
 import com.example.chatservice.user.repository.UserRepository;
@@ -38,11 +40,8 @@ public class MessageService {
     private final ReadStatusRepository readStatusRepository;
     private final UserChatRepository userChatRepository;
     private final Snowflake snowflake = new Snowflake();
-    private final ServerInfoProvider serverInfoProvider;
-    private final SessionManager sessionManager;
-    private final RestTemplate restTemplate;
-    private final AsyncMessageDeliveryService asyncMessageDeliveryService;
     private final MessageDeliveryService messageDeliveryService; // 동기 전송용
+    private final ChatMessageProducer chatMessageProducer;
 
 
     @Transactional
@@ -69,7 +68,7 @@ public class MessageService {
 
         //TODO:FLOW - 6. 메시지 전송 후 read_status 상태를 업데이트 해야 함
         ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
-        
+
         // ReadStatus가 없으면 생성 (joinChatRoom으로 추가된 사용자는 ReadStatus가 없을 수 있음)
         if (senderReadStatus == null) {
             senderReadStatus = ReadStatus.builder()
@@ -80,12 +79,12 @@ public class MessageService {
             readStatusRepository.save(senderReadStatus);
         }
 
-         messageRepository.saveAndFlush(message); // flush 필수
+        messageRepository.saveAndFlush(message); // flush 필수
 //        messageRepository.save(message);
 
         senderReadStatus.updateReadMessage(message);
     }
-
+    //2번
     @Transactional
     public void sendMessageViaWebSocket(Long senderId, Long receiverId,
                                         Long chatRoomId, String content) {
@@ -116,117 +115,116 @@ public class MessageService {
         log.info("Sending message to sender {} immediately", senderId);
         messageDeliveryService.deliverMessage(senderId, message);
 
+        // TODO : userChat lastMessageId를 업데이트를 어떻게 할 까?
+
+        // TODO : read status
+        // 읽음처리 요 부분도 트래픽관점에서 무거울 수 있는 비슷한 이유가 있는데
+        // 1000명방
+        // 공구이벤트중이어서 1000명이 다 접속중
+        // 이 상황에서 메시지를 1건보내면
+        // 1000명한테서 읽음처리요청이 들어옴
+        // 100 * 1000
+
         // 엔티티 꼭 찝어서 가져와서 업데이트
         // vs
         // @Modifiying. ... update ...
         // update last seen ... last seen message id = 10 where last seen message id < 10;    // 11
         // 낙관적락
 
-        // 5. 다른 사용자들에게는 비동기로 전송
-        // 5. 트랜잭션 커밋 후 비동기 실행
+        // 5. 다른 사용자들에게는 Kafka를 통해 비동기로 전송
+        // 트랜잭션 커밋 후 Kafka 발행
         Long messageId = message.getId();
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        log.info("Transaction committed. Starting async delivery for message {}", messageId);
-                        asyncMessageDeliveryService.deliverMessageAsync(
-                                senderId,
-                                receiverId,
-                                chatRoomId,
-                                messageId
-                        );
+                        log.info("Transaction committed. Publishing message to Kafka: messageId={}", messageId);
+
+                        // Kafka로 메시지 발행
+                        ChatMessageEvent event =
+                                new ChatMessageEvent(
+                                        message.getId(),
+                                        message.getSender().getId(),
+                                        message.getMessage(),
+                                        message.getChatRoom().getId(),
+                                        message.getCreatedAt()
+                                );
+
+                        chatMessageProducer.sendMessage(event);
+                        log.info("Message published to Kafka: messageId={}", messageId);
                     }
                 }
         );
 //        MessageDto.from(message);
     }
+    // TODO : message 읽음 상태(read_status) 로직을 분리하자
+    public List<MessageResponse> getMessages(
+            Long currentUserId,
+            Long chatRoomId,
+            Long lastReadMessageId,
+            int before, int after
+    ) {
+        User currentUser = userRepository.findById(currentUserId).orElseThrow();
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
 
-        @Transactional
-        public List<MessageResponse> getMessages (
-                Long currentUserId,
-                Long chatRoomId,
-                Long lastReadMessageId,
-        int before, int after
-    ){
-            User currentUser = userRepository.findById(currentUserId).orElseThrow();
-            ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
+        // 1. lastReadMessageId가 null이면 DB에서 내 ReadStatus 조회
+        if (lastReadMessageId == null) {
+            ReadStatus myReadStatus = readStatusRepository
+                    .findByUserAndChatRoom(currentUser, chatRoom);
 
-            // 1. lastReadMessageId가 null이면 DB에서 내 ReadStatus 조회
-            if (lastReadMessageId == null) {
-                ReadStatus myReadStatus = readStatusRepository
-                        .findByUserAndChatRoom(currentUser, chatRoom);
+            if (myReadStatus != null && myReadStatus.getLastReadMessage() != null) {
+                // 내가 마지막으로 읽은 메시지 기준
+                lastReadMessageId = myReadStatus.getLastReadMessage().getId();
+            } else {
+                // 처음 들어온 사람이면 첫 메시지부터
+                Message firstMessage = messageRepository
+                        .findTopByChatRoomIdOrderByIdAsc(chatRoomId)
+                        .orElse(null);
 
-                if (myReadStatus != null && myReadStatus.getLastReadMessage() != null) {
-                    // 내가 마지막으로 읽은 메시지 기준
-                    lastReadMessageId = myReadStatus.getLastReadMessage().getId();
+                if (firstMessage != null) {
+                    lastReadMessageId = firstMessage.getId();
+                    before = 0;  // 처음이니까 before는 0
                 } else {
-                    // 처음 들어온 사람이면 첫 메시지부터
-                    Message firstMessage = messageRepository
-                            .findTopByChatRoomIdOrderByIdAsc(chatRoomId)
-                            .orElse(null);
-
-                    if (firstMessage != null) {
-                        lastReadMessageId = firstMessage.getId();
-                        before = 0;  // 처음이니까 before는 0
-                    } else {
-                        // 메시지가 하나도 없으면 빈 리스트 반환
-                        return new ArrayList<>();
-                    }
+                    // 메시지가 하나도 없으면 빈 리스트 반환
+                    return new ArrayList<>();
                 }
             }
+        }
 
-            // 2. before 메시지 조회 (lastReadMessageId보다 작은 ID)
-            List<Message> beforeMessages = new ArrayList<>();
-            if (before > 0) {
-                beforeMessages = messageRepository
-                        .findByChatRoomIdAndIdLessThanOrderByIdDesc(
-                                chatRoomId,
-                                lastReadMessageId,
-                                PageRequest.of(0, before)
-                        );
-            }
+        // 2. before 메시지 조회 (lastReadMessageId보다 작은 ID)
+        List<Message> beforeMessages = new ArrayList<>();
+        if (before > 0) {
+            beforeMessages = messageRepository
+                    .findByChatRoomIdAndIdLessThanOrderByIdDesc(
+                            chatRoomId,
+                            lastReadMessageId,
+                            PageRequest.of(0, before)
+                    );
+        }
 
-            // 3. after 메시지 조회 (lastReadMessageId보다 큰 ID)
-            List<Message> afterMessages = new ArrayList<>();
-            if (after > 0) {
-                afterMessages = messageRepository
-                        .findByChatRoomIdAndIdGreaterThanOrderByIdAsc(
-                                chatRoomId,
-                                lastReadMessageId,
-                                PageRequest.of(0, after)
-                        );
-            }
+        // 3. after 메시지 조회 (lastReadMessageId보다 큰 ID)
+        List<Message> afterMessages = new ArrayList<>();
+        if (after > 0) {
+            afterMessages = messageRepository
+                    .findByChatRoomIdAndIdGreaterThanOrderByIdAsc(
+                            chatRoomId,
+                            lastReadMessageId,
+                            PageRequest.of(0, after)
+                    );
+        }
 
-            // 4. baseMessage 자체도 포함
-            Message baseMessage = messageRepository.findById(lastReadMessageId).orElse(null);
+        // 4. baseMessage 자체도 포함
+        Message baseMessage = messageRepository.findById(lastReadMessageId).orElse(null);
 
-            // 5. 합치기 (시간순 정렬)
-            List<Message> allMessages = new ArrayList<>();
-            Collections.reverse(beforeMessages); // DESC였으니 뒤집기
-            allMessages.addAll(beforeMessages);
-            if (baseMessage != null) {
-                allMessages.add(baseMessage);
-            }
-            allMessages.addAll(afterMessages);
-            //TODO:FLOW - 7. 메시지를 읽으면 read_status 어디까지 읽었는지 업데이트
-            // 6. 읽음 처리: 채팅방의 최신 메시지로 업데이트
-            Message latestMessageInChatRoom = messageRepository
-                    .findTopByChatRoomIdOrderByIdDesc(chatRoomId)
-                    .orElse(null);
-
-            if (latestMessageInChatRoom != null) {
-                ReadStatus userReadStatus = readStatusRepository
-                        .findByUserAndChatRoom(currentUser, chatRoom);
-
-                // 현재 읽은 메시지보다 최신이면 업데이트
-                if (userReadStatus.getLastReadMessage() == null ||
-                        latestMessageInChatRoom.getId() > userReadStatus.getLastReadMessage().getId()) {
-                    userReadStatus.updateReadMessage(latestMessageInChatRoom);
-                }
-            }
-
-            // 6.
+        // 5. 합치기 (시간순 정렬)
+        List<Message> allMessages = new ArrayList<>();
+        Collections.reverse(beforeMessages); // DESC였으니 뒤집기
+        allMessages.addAll(beforeMessages);
+        if (baseMessage != null) {
+            allMessages.add(baseMessage);
+        }
+        allMessages.addAll(afterMessages);
+        // 6.
         /*
         1. 해당 채팅방에 참여중인 유저아이디들을 조회. (리스트 롱)
         2. 반복문 돌리면서
@@ -238,16 +236,50 @@ public class MessageService {
 
         */
 
-            // 7. Response 변환
-            List<MessageResponse> messageResponses = new ArrayList<>();
-            for (Message message : allMessages) {
-                messageResponses.add(new MessageResponse(
-                        message.getSender().getId(),
-                        message.getMessage()
-                ));
-            }
-
-            return messageResponses;
+        // 7. Response 변환
+        List<MessageResponse> messageResponses = new ArrayList<>();
+        for (Message message : allMessages) {
+            messageResponses.add(new MessageResponse(
+                    message.getSender().getId(),
+                    message.getMessage()
+            ));
         }
 
+        return messageResponses;
     }
+
+    @Transactional
+    public void markMessagesAsRead(Long currentUserId, Long chatRoomId, Long messageId) {
+        User currentUser = userRepository.findById(currentUserId).orElseThrow();
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
+
+        Message targetMessage;
+        if (messageId != null) {
+            targetMessage = messageRepository.findById(messageId)
+                    .orElseThrow(() -> new IllegalArgumentException("Message not found: " + messageId));
+        } else {
+            targetMessage = messageRepository
+                    .findTopByChatRoomIdOrderByIdDesc(chatRoomId)
+                    .orElse(null);
+        }
+
+        if (targetMessage == null) {
+            return; // 채팅방에 메시지가 없으면 아무 것도 하지 않음
+        }
+
+        ReadStatus userReadStatus = readStatusRepository.findByUserAndChatRoom(currentUser, chatRoom);
+        if (userReadStatus == null) {
+            userReadStatus = ReadStatus.builder()
+                    .user(currentUser)
+                    .chatRoom(chatRoom)
+                    .lastReadMessage(null)
+                    .build();
+            readStatusRepository.save(userReadStatus);
+        }
+
+        if (userReadStatus.getLastReadMessage() == null ||
+                targetMessage.getId() > userReadStatus.getLastReadMessage().getId()) {
+            userReadStatus.updateReadMessage(targetMessage);
+        }
+    }
+}
