@@ -85,8 +85,7 @@ public class MessageService {
             readStatusRepository.save(senderReadStatus);
         }
 
-        messageRepository.saveAndFlush(message); // flush 필수
-//        messageRepository.save(message);
+        messageRepository.saveAndFlush(message);
 
         updateUserChatLastMessage(chatRoom, message.getId());
         senderReadStatus.updateReadMessage(message);
@@ -232,7 +231,6 @@ public class MessageService {
         return "chat:%d:lastApplied".formatted(chatRoomId);
     }
 
-    // TODO : message 읽음 상태(read_status) 로직을 분리하자
     public List<MessageResponse> getMessages(
             Long currentUserId,
             Long chatRoomId,

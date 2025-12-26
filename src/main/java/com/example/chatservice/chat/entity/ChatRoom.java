@@ -18,7 +18,6 @@ public class ChatRoom {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // -> enum 이 더 좋은 선택
     @Enumerated(EnumType.STRING)
     private ChatType type; // direct, group
 

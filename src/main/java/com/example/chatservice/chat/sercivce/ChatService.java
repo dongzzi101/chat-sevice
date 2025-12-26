@@ -92,8 +92,7 @@ public class ChatService {
 
     private ChatRoom findExistChatRoom(List<Long> userIds) {
         String chatKey = findChatKey(userIds);
-        ChatRoom chatRoom = chatRepository.findChatRoomByChatKey(chatKey).orElse(null);
-        return chatRoom;
+        return chatRepository.findChatRoomByChatKey(chatKey).orElse(null);
     }
 
     // chat key 생성해주는 역할

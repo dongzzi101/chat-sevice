@@ -18,29 +18,7 @@ public class ChatController {
 
     private final ChatService chatService;
 
-    // TODO 3 : 채팅방 flow
-
-    /**
-     * 기존 메시지를 보낼 때 보내는 쪽에서 senderId를 헤더에 넣고 받는쪽에 receiverId를 넣어서 받았음
-     * e.g) /api/v1/messages/{receiverId}
-
-     * 근데 이렇게 하는 것보다 그룹 or 개인 상관없이 chatRoomId(채티방 Id)를 만들어서
-     * 거기가다 보내주는 게 나은 듯
-     * e.g) /api/v1/messages/{chatRoomId}
-
-     * 여기서 문제는 맨 처음 메시지를 chatRoomId가 없는데 어떻게 보내야하지?
-     * 1. userId를 임의적으로 받아서 만든다 (하나만 받으면 개인, 여러개 받으면 단체 채팅방)
-     */
-
-
-    /**
-     * 단체 메시지는 채팅방을 만들면서 참가자들 초대하는 로직이 이해가 됨
-     * 근데 1대1일 메시지에서는 채팅방 생성을 따로 하는 게 아니고
-     * 메시지를 보냄과 동시에 채팅방이 만들어 지는 건가?
-     */
-
     // 채팅방 만들기
-    // TODO:FLOW - 2.사용자A 가 친구A한테 메시지를 보낸다고 가정
     @PostMapping("/api/v1/chat")
     public ChatResponse createChatRoom(@CurrentUser UserPrincipal userPrincipal, @RequestBody ChatRequest chatRequest) {
         Long id = userPrincipal.getId();
