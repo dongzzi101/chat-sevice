@@ -35,12 +35,18 @@ public class UserChat{
     // private Long lastMessageId; // snowflake
     // private Long lastMessageTime;
 
+    private Long lastMessageId;
+
     // private Long favoriteTime; // pinnedAt;
 
     @Builder
     public UserChat(User user, ChatRoom chatRoom) {
         this.user = user;
         this.chatRoom = chatRoom;
+    }
+
+    public void updateLastMessageId(Long lastMessageId) {
+        this.lastMessageId = lastMessageId;
     }
 
     public void leaveChatRoom() {

@@ -24,8 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.*;
 
 @Service
@@ -42,6 +42,12 @@ public class MessageService {
     private final Snowflake snowflake = new Snowflake();
     private final MessageDeliveryService messageDeliveryService; // 동기 전송용
     private final ChatMessageProducer chatMessageProducer;
+
+    private static final Duration HOT_WINDOW = Duration.ofSeconds(5);
+    private static final Duration HOT_MODE_TTL = Duration.ofSeconds(30);
+    private static final Duration HOT_DEBOUNCE = Duration.ofSeconds(3);
+    private static final long HOT_ENTER_THRESHOLD = 50L;
+    private static final long HOT_EXIT_THRESHOLD = 20L;
 
 
     @Transactional
@@ -82,8 +88,10 @@ public class MessageService {
         messageRepository.saveAndFlush(message); // flush 필수
 //        messageRepository.save(message);
 
+        updateUserChatLastMessage(chatRoom, message.getId());
         senderReadStatus.updateReadMessage(message);
     }
+
     //2번
     @Transactional
     public void sendMessageViaWebSocket(Long senderId, Long receiverId,
@@ -107,6 +115,7 @@ public class MessageService {
         messageRepository.saveAndFlush(message);
         log.info("Message saved to DB: id={}", message.getId());
 
+        updateUserChatLastMessage(chatRoom, message.getId());
         // 3. ReadStatus 업데이트 (발신자)
         ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
         senderReadStatus.updateReadMessage(message);
@@ -157,6 +166,72 @@ public class MessageService {
         );
 //        MessageDto.from(message);
     }
+
+    private void updateUserChatLastMessage(ChatRoom chatRoom, Long messageId) {
+        boolean hotRoom = isHotRoom(chatRoom.getId());
+
+        if (hotRoom && shouldSkipHotUpdate(chatRoom.getId())) {
+            return;
+        }
+
+        userChatRepository.updateLastMessageIdForChat(chatRoom.getId(), messageId);
+    }
+
+    private boolean isHotRoom(Long chatRoomId) {
+        String countKey = msgCountKey(chatRoomId);
+        Long count = redisTemplate.opsForValue().increment(countKey);
+        redisTemplate.expire(countKey, HOT_WINDOW);
+
+        String modeKey = modeKey(chatRoomId);
+        String mode = redisTemplate.opsForValue().get(modeKey);
+
+        if (count != null && count >= HOT_ENTER_THRESHOLD) {
+            if (!"hot".equals(mode)) {
+                redisTemplate.opsForValue().set(modeKey, "hot", HOT_MODE_TTL);
+            }
+            return true;
+        }
+
+        if ("hot".equals(mode) && count != null && count <= HOT_EXIT_THRESHOLD) {
+            redisTemplate.opsForValue().set(modeKey, "cool", HOT_MODE_TTL);
+            return false;
+        }
+
+        return "hot".equals(mode);
+    }
+
+    private boolean shouldSkipHotUpdate(Long chatRoomId) {
+        String lastKey = lastAppliedKey(chatRoomId);
+        String lastTs = redisTemplate.opsForValue().get(lastKey);
+        long now = System.currentTimeMillis();
+
+        if (lastTs != null) {
+            try {
+                long last = Long.parseLong(lastTs);
+                if (now - last < HOT_DEBOUNCE.toMillis()) {
+                    return true;
+                }
+            } catch (NumberFormatException e) {
+                log.warn("Invalid last applied timestamp for chatRoomId={}", chatRoomId);
+            }
+        }
+
+        redisTemplate.opsForValue().set(lastKey, String.valueOf(now), HOT_MODE_TTL);
+        return false;
+    }
+
+    private String msgCountKey(Long chatRoomId) {
+        return "chat:%d:msgCount".formatted(chatRoomId);
+    }
+
+    private String modeKey(Long chatRoomId) {
+        return "chat:%d:mode".formatted(chatRoomId);
+    }
+
+    private String lastAppliedKey(Long chatRoomId) {
+        return "chat:%d:lastApplied".formatted(chatRoomId);
+    }
+
     // TODO : message 읽음 상태(read_status) 로직을 분리하자
     public List<MessageResponse> getMessages(
             Long currentUserId,

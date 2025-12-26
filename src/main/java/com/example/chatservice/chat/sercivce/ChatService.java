@@ -117,16 +117,31 @@ public class ChatService {
 
         List<ChatRoomResponse> chatroomResponses = new ArrayList<>();
 
-        List<UserChat> userChatList = userChatRepository.findByUserId(currentUserId);
+        List<UserChat> userChatList = userChatRepository.findByUserIdOrderByLastMessageIdDesc(currentUserId);
         User currentUser = userRepository.findById(currentUserId).orElseThrow();
+
+        List<Long> lastMessageIds = userChatList.stream()
+                .map(UserChat::getLastMessageId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        Map<Long, Message> lastMessagesById = messageRepository.findAllById(lastMessageIds)
+                .stream()
+                .collect(Collectors.toMap(Message::getId, m -> m));
 
         for (UserChat userChat : userChatList) {
 
             ChatRoom chatRoom = userChat.getChatRoom();
             // 1. 채팅방의 마지막 메시지 가져오기
-            Message lastMessage = messageRepository
-                    .findTopByChatRoomIdOrderByIdDesc(chatRoom.getId())
-                    .orElse(null);
+            Message lastMessage = userChat.getLastMessageId() != null
+                    ? lastMessagesById.get(userChat.getLastMessageId())
+                    : null;
+
+            if (lastMessage == null && userChat.getLastMessageId() == null) {
+                lastMessage = messageRepository
+                        .findTopByChatRoomIdOrderByIdDesc(chatRoom.getId())
+                        .orElse(null);
+            }
 
             // 2. 내가 마지막으로 읽은 메시지 정보 가져오기 -> 안읽은 메시지 수 개산하려고
             ReadStatus myReadStatus = readStatusRepository
@@ -156,13 +171,6 @@ public class ChatService {
             chatroomResponses.add(response);
         }
 
-        // TODO : 여기부분 공부하기
-        chatroomResponses.sort((a, b) -> {
-            if (a.getLastMessageId() == null) return 1;
-            if (b.getLastMessageId() == null) return -1;
-            return b.getLastMessageId().compareTo(a.getLastMessageId());  // ID 비교!
-        });
-
         return chatroomResponses;
     }
 
@@ -184,7 +192,7 @@ public class ChatService {
                 .build();
 
         userChatRepository.save(userChat);
-        
+
         // ReadStatus도 생성 (채팅방 참여 시 읽음 상태 초기화)
         ReadStatus existingReadStatus = readStatusRepository.findByUserAndChatRoom(user, chatRoom);
         if (existingReadStatus == null) {
