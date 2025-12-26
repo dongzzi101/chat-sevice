@@ -49,11 +49,11 @@ public class MessageService {
     private static final Duration HOT_WINDOW = Duration.ofSeconds(5);
     private static final Duration HOT_MODE_TTL = Duration.ofSeconds(30);
     private static final Duration HOT_DEBOUNCE = Duration.ofSeconds(3);
-    private static final long HOT_ENTER_THRESHOLD = 50L;
-    private static final long HOT_EXIT_THRESHOLD = 20L;
+    private static final long HOT_ENTER_THRESHOLD = 5L;
+    private static final long HOT_EXIT_THRESHOLD = 2L;
 
 
-    @Transactional
+    /*@Transactional
     public void sendMessage(MessageRequest messageRequest, Long senderUserId, Long chatRoomId) {
         User senderUser = userRepository.findById(senderUserId)
                 .orElseThrow(() -> new UserNotFoundException(senderUserId));
@@ -61,14 +61,14 @@ public class MessageService {
                 .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
 
         // TODO 3 : 근데 메시지 저장이 하나만 되는게 맞겠죠? 중요도 낮음
-        /**
+        *//**
          * userA -> userB :hello
          * message : hello 저장
          * userB는 메시지를 어떻게 가져올까 고민
          * 나중에 메시지가 너무 많아지면 userId를 기준으로 샤드키로 잡고 샤딩을 하는건가..?
          * 근데 메시지를 userId로 샤드키로 해두면 사용하는 의미가 잇나?
          * 뭘로해야하는지 고민
-         */
+         *//*
 
         Message message = Message.builder()
                 .id(snowflake.nextId())
@@ -94,7 +94,7 @@ public class MessageService {
 
         updateUserChatLastMessage(chatRoom, message.getId());
         senderReadStatus.updateReadMessage(message);
-    }
+    }*/
 
     //2번
     @Transactional
@@ -129,8 +129,6 @@ public class MessageService {
         messageDeliveryService.deliverMessage(senderId, message);
 
         // TODO : userChat lastMessageId를 업데이트를 어떻게 할 까?
-
-        // TODO : read status
         // 읽음처리 요 부분도 트래픽관점에서 무거울 수 있는 비슷한 이유가 있는데
         // 1000명방
         // 공구이벤트중이어서 1000명이 다 접속중

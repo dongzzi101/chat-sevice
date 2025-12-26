@@ -13,7 +13,6 @@ import com.example.chatservice.chat.repository.UserChatRepository;
 import com.example.chatservice.exception.ChatRoomNotFoundException;
 import com.example.chatservice.exception.UserNotJoinedException;
 import com.example.chatservice.exception.UserNotFoundException;
-import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.repository.MessageRepository;
 import com.example.chatservice.user.entity.User;
@@ -23,6 +22,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -39,13 +41,14 @@ public class ChatService {
     @Transactional
     public ChatResponse createChatRoom(Long currentUserId, ChatRequest chatRequest) {
 
-        List<Long> userIds = chatRequest.getUserIds();
+        List<Long> userIds = new ArrayList<>(chatRequest.getUserIds());
         userIds.add(currentUserId);
+        List<Long> normalizedUserIds = normalizeUserIds(userIds);
 
         ChatRoom chatRoom;
 
         // TODO:FLOW - 3. 채팅방이 있는지 확인
-        ChatRoom existChatRoom = findExistChatRoom(userIds);
+        ChatRoom existChatRoom = findExistChatRoom(normalizedUserIds);
 
         // TODO:FLOW - 3.1. 있는 경우 기존 채팅방
         if (existChatRoom != null) {
@@ -55,12 +58,12 @@ public class ChatService {
 
             // TODO:FLOW - 3.2. 채팅방 없는 경우 새로운 채팅방을 생성
 
-            String chatKey = createChatKey(userIds);
+            String chatKey = createChatKey(normalizedUserIds);
 
-            boolean isSelfChat = userIds.get(0).equals(userIds.get(1));
+            boolean isSelfChat = normalizedUserIds.size() == 1;
 
             ChatType chatType = isSelfChat ? ChatType.IM :
-                    (userIds.size() == 2 ? ChatType.DIRECT : ChatType.GROUP);
+                    (normalizedUserIds.size() == 2 ? ChatType.DIRECT : ChatType.GROUP);
 
             chatRoom = ChatRoom.builder()
                     .type(chatType)
@@ -69,7 +72,7 @@ public class ChatService {
 
             chatRepository.save(chatRoom);
 
-            Set<Long> uniqueUserIds = new HashSet<>(userIds);
+            Set<Long> uniqueUserIds = new HashSet<>(normalizedUserIds);
 
             for (Long userId : uniqueUserIds) {
                 User user = userRepository.findById(userId)
@@ -96,24 +99,44 @@ public class ChatService {
     }
 
     private ChatRoom findExistChatRoom(List<Long> userIds) {
-        String chatKey = findChatKey(userIds);
+        String chatKey = createChatKey(userIds);
         return chatRepository.findChatRoomByChatKey(chatKey).orElse(null);
     }
 
     // chat key 생성해주는 역할
     private String createChatKey(List<Long> userIds) {
-        userIds.sort(Comparator.naturalOrder());
-        return userIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining("_"));
+        try {
+            // 1. 정렬 + 중복 제거 + 문자열 결합
+            String rawKey = normalizeUserIds(userIds).stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining("_"));
+
+            // 2. SHA-256 해시
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawKey.getBytes(StandardCharsets.UTF_8));
+
+            // 3. hex 문자열 변환
+            return bytesToHex(hash);
+
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not supported", e);
+        }
     }
 
-    // chat key를 찾는 역할?
-    private String findChatKey(List<Long> userIds) {
-        userIds.sort(Comparator.naturalOrder());
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
+    private List<Long> normalizeUserIds(List<Long> userIds) {
         return userIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining("_"));
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
     }
 
 
