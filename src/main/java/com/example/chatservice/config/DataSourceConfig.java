@@ -19,6 +19,5 @@ public class DataSourceConfig {
         hikariConfig.setMaximumPoolSize(20);
         hikariConfig.setMinimumIdle(20);
         return new HikariDataSource(hikariConfig);
-        // test
     }
 }

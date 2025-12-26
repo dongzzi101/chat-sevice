@@ -8,8 +8,8 @@ import lombok.Getter;
 @Getter
 public class ChatResponse {
 
-    private Long id;
-    private ChatType type;
+    private final Long id;
+    private final ChatType type;
 
     @Builder
     public ChatResponse(Long id, ChatType type) {

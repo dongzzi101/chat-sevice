@@ -53,6 +53,10 @@ dependencies {
     implementation("io.opentracing:opentracing-api:0.33.0")
     implementation("io.opentracing:opentracing-util:0.33.0")
 
+    // kafka
+    implementation 'org.springframework.kafka:spring-kafka'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+
 }
 
 tasks.named('test') {

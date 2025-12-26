@@ -91,15 +91,4 @@ public class UserService { // UserServiceCGlibSpringProxyTx
 
         return userResponses;
     }
-
-//    public void getUser(Long userId){
-//        User user = redisTemplate.get(userId); // look aside
-//        if(user == null){
-//            user = userRepository.findById(userId);
-//            redisTemplate.set(userId, user); // lazy loading
-//            return user;
-//        } else {
-//            return user;
-//        }
-//    }
 }

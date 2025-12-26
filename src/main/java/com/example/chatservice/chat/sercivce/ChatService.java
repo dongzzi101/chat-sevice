@@ -10,8 +10,9 @@ import com.example.chatservice.chat.entity.UserChat;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
+import com.example.chatservice.exception.ChatRoomNotFoundException;
 import com.example.chatservice.exception.UserNotJoinedException;
-import com.example.chatservice.message.controller.request.MessageRequest;
+import com.example.chatservice.exception.UserNotFoundException;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.repository.MessageRepository;
 import com.example.chatservice.user.entity.User;
@@ -21,6 +22,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,13 +41,14 @@ public class ChatService {
     @Transactional
     public ChatResponse createChatRoom(Long currentUserId, ChatRequest chatRequest) {
 
-        List<Long> userIds = chatRequest.getUserIds();
+        List<Long> userIds = new ArrayList<>(chatRequest.getUserIds());
         userIds.add(currentUserId);
+        List<Long> normalizedUserIds = normalizeUserIds(userIds);
 
         ChatRoom chatRoom;
 
         // TODO:FLOW - 3. 채팅방이 있는지 확인
-        ChatRoom existChatRoom = findExistChatRoom(userIds);
+        ChatRoom existChatRoom = findExistChatRoom(normalizedUserIds);
 
         // TODO:FLOW - 3.1. 있는 경우 기존 채팅방
         if (existChatRoom != null) {
@@ -53,12 +58,12 @@ public class ChatService {
 
             // TODO:FLOW - 3.2. 채팅방 없는 경우 새로운 채팅방을 생성
 
-            String chatKey = createChatKey(userIds);
+            String chatKey = createChatKey(normalizedUserIds);
 
-            boolean isSelfChat = userIds.get(0).equals(userIds.get(1));
+            boolean isSelfChat = normalizedUserIds.size() == 1;
 
             ChatType chatType = isSelfChat ? ChatType.IM :
-                    (userIds.size() == 2 ? ChatType.DIRECT : ChatType.GROUP);
+                    (normalizedUserIds.size() == 2 ? ChatType.DIRECT : ChatType.GROUP);
 
             chatRoom = ChatRoom.builder()
                     .type(chatType)
@@ -67,18 +72,21 @@ public class ChatService {
 
             chatRepository.save(chatRoom);
 
-            Set<Long> uniqueUserIds = new HashSet<>(userIds);
+            Set<Long> uniqueUserIds = new HashSet<>(normalizedUserIds);
 
             for (Long userId : uniqueUserIds) {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new UserNotFoundException(userId));
+
                 UserChat userChat = UserChat.builder()
                         .chatRoom(chatRoom)
-                        .user(userRepository.findById(userId).get())
+                        .user(user)
                         .build();
                 userChatRepository.save(userChat);
 
                 // TODO:FLOW - 4.채팅방 생성 시 read_status 생성
                 ReadStatus readStatus = ReadStatus.builder()
-                        .user(userRepository.findById(userId).get())
+                        .user(user)
                         .chatRoom(chatRoom)
                         .lastReadMessage(null)
                         .build();
@@ -91,31 +99,44 @@ public class ChatService {
     }
 
     private ChatRoom findExistChatRoom(List<Long> userIds) {
-        String chatKey = findChatKey(userIds);
-        ChatRoom chatRoom = chatRepository.findChatRoomByChatKey(chatKey).orElse(null);
-        return chatRoom;
-
-//        if (userIds.size() == 2) {
-//            return userChatRepository.findDirectChatRoomByUserIds(userIds).orElse(null);
-//        } else {
-//            return userChatRepository.findGroupChatRoomByUserIds(userIds, userIds.size()).orElse(null);
-//        }
+        String chatKey = createChatKey(userIds);
+        return chatRepository.findChatRoomByChatKey(chatKey).orElse(null);
     }
 
     // chat key 생성해주는 역할
     private String createChatKey(List<Long> userIds) {
-        userIds.sort(Comparator.naturalOrder());
-        return userIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining("_"));
+        try {
+            // 1. 정렬 + 중복 제거 + 문자열 결합
+            String rawKey = normalizeUserIds(userIds).stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining("_"));
+
+            // 2. SHA-256 해시
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawKey.getBytes(StandardCharsets.UTF_8));
+
+            // 3. hex 문자열 변환
+            return bytesToHex(hash);
+
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not supported", e);
+        }
     }
 
-    // chat key를 찾는 역할?
-    private String findChatKey(List<Long> userIds) {
-        userIds.sort(Comparator.naturalOrder());
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
+    private List<Long> normalizeUserIds(List<Long> userIds) {
         return userIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining("_"));
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
     }
 
 
@@ -123,21 +144,31 @@ public class ChatService {
 
         List<ChatRoomResponse> chatroomResponses = new ArrayList<>();
 
-        List<UserChat> userChatList = userChatRepository.findByUserId(currentUserId);
+        List<UserChat> userChatList = userChatRepository.findByUserIdOrderByLastMessageIdDesc(currentUserId);
         User currentUser = userRepository.findById(currentUserId).orElseThrow();
+
+        List<Long> lastMessageIds = userChatList.stream()
+                .map(UserChat::getLastMessageId)
+                .filter(Objects::nonNull)
+                .toList();
+
+        Map<Long, Message> lastMessagesById = messageRepository.findAllById(lastMessageIds)
+                .stream()
+                .collect(Collectors.toMap(Message::getId, m -> m));
 
         for (UserChat userChat : userChatList) {
 
             ChatRoom chatRoom = userChat.getChatRoom();
-            // TODO : 뭐지?
             // 1. 채팅방의 마지막 메시지 가져오기
-            Message lastMessage = messageRepository
-                    .findTopByChatRoomIdOrderByIdDesc(chatRoom.getId())
-                    .orElse(null);
+            Message lastMessage = userChat.getLastMessageId() != null
+                    ? lastMessagesById.get(userChat.getLastMessageId())
+                    : null;
 
-//            Message lastMessage = messageRepository
-//                    .findTopByChatRoomIdOrderByCreatedAtDesc(chatRoom.getId())
-//                    .orElse(null);
+            if (lastMessage == null && userChat.getLastMessageId() == null) {
+                lastMessage = messageRepository
+                        .findTopByChatRoomIdOrderByIdDesc(chatRoom.getId())
+                        .orElse(null);
+            }
 
             // 2. 내가 마지막으로 읽은 메시지 정보 가져오기 -> 안읽은 메시지 수 개산하려고
             ReadStatus myReadStatus = readStatusRepository
@@ -167,28 +198,16 @@ public class ChatService {
             chatroomResponses.add(response);
         }
 
-        // TODO : 여기부분 공부하기
-        chatroomResponses.sort((a, b) -> {
-            if (a.getLastMessageId() == null) return 1;
-            if (b.getLastMessageId() == null) return -1;
-            return b.getLastMessageId().compareTo(a.getLastMessageId());  // ID 비교!
-        });
-
-
-//        chatroomResponses.sort((a, b) -> {
-//            if (a.getLastMessageDateTime() == null) return 1;
-//            if (b.getLastMessageDateTime() == null) return -1;
-//            return b.getLastMessageDateTime().compareTo(a.getLastMessageDateTime());
-//        });
-
         return chatroomResponses;
     }
 
     @Transactional
     public void joinChatRoom(Long chatId, Long userId) {
 
-        User user = userRepository.findById(userId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+        ChatRoom chatRoom = chatRepository.findById(chatId)
+                .orElseThrow(() -> new ChatRoomNotFoundException(chatId));
         // 코드의 가독성을 좋게하기위해 예외케이스는 빨리빨리 던져버린다.
         // 이렇게 던진 에러(익셉션)을 따로 핸들링 해줘야하는가? 아닌가
 
@@ -202,7 +221,7 @@ public class ChatService {
                 .build();
 
         userChatRepository.save(userChat);
-        
+
         // ReadStatus도 생성 (채팅방 참여 시 읽음 상태 초기화)
         ReadStatus existingReadStatus = readStatusRepository.findByUserAndChatRoom(user, chatRoom);
         if (existingReadStatus == null) {
@@ -220,11 +239,13 @@ public class ChatService {
 
     @Transactional
     public void leaveChatRoom(Long chatRoomId, Long currentUserId) {
-        User user = userRepository.findById(currentUserId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UserNotFoundException(currentUserId));
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId)
+                .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
 
         UserChat userChat = userChatRepository.findByUserAndChatRoom(user, chatRoom)
-                .orElseThrow(() -> new RuntimeException("채팅방에 참여하지 않음"));
+                .orElseThrow(() -> new UserNotJoinedException(chatRoomId, currentUserId));
 
         userChat.leaveChatRoom();
 
@@ -240,32 +261,6 @@ public class ChatService {
         String chatKey = createChatKey(new ArrayList<>(activeUserIds));
         chatRoom.updateChatKey(chatKey);
 
-/*
-        List<UserChat> userChats = chatRoom.getUserChats();
-
-        Set<Long> uniqueUserIds = new HashSet<>();
-
-        for (UserChat chat : userChats) {
-            uniqueUserIds.add(chat.getUser().getId());
-        }
-
-        String chatKey = createChatKey(new ArrayList<>(uniqueUserIds));
-        chatRoom.updateChatKey(chatKey);
-*/
-
-    }
-
-    @Transactional
-    public void sendMessage(Long chatId, MessageRequest messageRequest, Long currentUserId) throws UserNotJoinedException {
-        User user = userRepository.findById(currentUserId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
-
-        // if(true)
-        throw new UserNotJoinedException();
-
-//        Message.builder()
-
-
     }
 }
 
@@ -278,3 +273,22 @@ createad id ...
 
 3. message time 보고 user chat을 다시 내가 원하는대로 정렬해준다...
 * */
+
+/*
+11
+10
+9
+8
+7
+6
+5
+4
+3
+2
+1
+select * userchat order by id desc limit 10;
+
+select * messages in (2~11)
+
+
+*/

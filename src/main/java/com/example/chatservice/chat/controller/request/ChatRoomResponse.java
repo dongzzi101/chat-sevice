@@ -9,11 +9,11 @@ import java.util.function.Predicate;
 @Getter
 public class ChatRoomResponse {
 
-    private Long chatRoomId;
-    private String lastMessage;
-    private LocalDateTime lastMessageDateTime;
-    private Long unreadCount;
-    private Long lastMessageId;
+    private final Long chatRoomId;
+    private final String lastMessage;
+    private final LocalDateTime lastMessageDateTime;
+    private final Long unreadCount;
+    private final Long lastMessageId;
 
 
     @Builder

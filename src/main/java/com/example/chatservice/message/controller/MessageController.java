@@ -25,7 +25,7 @@ public class MessageController {
     // TODO 4 : 대화방이 있는지 확인 로직
 
     // TODO:FLOW - 5. 메시지를 /api/v1/messages/{chatRoomId}로 전송
-    @PostMapping("/api/v1/messages/{chatRoomId}")
+    /*@PostMapping("/api/v1/messages/{chatRoomId}")
     public void sendMessage(
             @CurrentUser UserPrincipal userPrincipal,
             @RequestBody MessageRequest message,
@@ -36,7 +36,7 @@ public class MessageController {
         messageService.sendMessage(message, senderUserId, chatRoomId);
         // 여기서 응답받고 메시지 뿌리기 가능할 듯
         // relay
-    }
+    }*/
 
     // TODO 3 : 메시지를 불러오기
     // 나에게 온 메시지를 들고오기 -> 이거는 따로 생각할 필요없이 한번에 다 불러와서 나눠주자
@@ -58,5 +58,16 @@ public class MessageController {
         Long currentUserId = userPrincipal.getId();
         return messageService.getMessages(currentUserId, chatRoomId, lastReadMessageId, before, after);
     }
+
+    @PostMapping("/api/v1/messages/{chatRoomId}/read")
+    public void readMessage(
+            @CurrentUser UserPrincipal userPrincipal,
+            @PathVariable Long chatRoomId,
+            @RequestParam(required = false) Long messageId
+    ) {
+        Long currentUserId = userPrincipal.getId();
+        messageService.markMessagesAsRead(currentUserId, chatRoomId, messageId);
+    }
+
 
 }
