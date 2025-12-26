@@ -8,6 +8,9 @@ import com.example.chatservice.chat.repository.UserChatRepository;
 import com.example.chatservice.common.ServerInfoProvider;
 import com.example.chatservice.common.SessionManager;
 import com.example.chatservice.common.snowflake.Snowflake;
+import com.example.chatservice.exception.ChatRoomNotFoundException;
+import com.example.chatservice.exception.MessageNotFoundException;
+import com.example.chatservice.exception.UserNotFoundException;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.entity.Message;
@@ -52,8 +55,10 @@ public class MessageService {
 
     @Transactional
     public void sendMessage(MessageRequest messageRequest, Long senderUserId, Long chatRoomId) {
-        User senderUser = userRepository.findById(senderUserId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
+        User senderUser = userRepository.findById(senderUserId)
+                .orElseThrow(() -> new UserNotFoundException(senderUserId));
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId)
+                .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
 
         // TODO 3 : 근데 메시지 저장이 하나만 되는게 맞겠죠? 중요도 낮음
         /**
@@ -99,9 +104,9 @@ public class MessageService {
 
         // 1. User, ChatRoom 조회
         User senderUser = userRepository.findById(senderId)
-                .orElseThrow(() -> new IllegalArgumentException("Sender not found"));
+                .orElseThrow(() -> new UserNotFoundException(senderId));
         ChatRoom chatRoom = chatRepository.findById(chatRoomId)
-                .orElseThrow(() -> new IllegalArgumentException("ChatRoom not found"));
+                .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
 
         // 2. DB에 메시지 저장
         Message message = Message.builder()
@@ -237,8 +242,10 @@ public class MessageService {
             Long lastReadMessageId,
             int before, int after
     ) {
-        User currentUser = userRepository.findById(currentUserId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UserNotFoundException(currentUserId));
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId)
+                .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
 
         // 1. lastReadMessageId가 null이면 DB에서 내 ReadStatus 조회
         if (lastReadMessageId == null) {
@@ -329,7 +336,7 @@ public class MessageService {
         Message targetMessage;
         if (messageId != null) {
             targetMessage = messageRepository.findById(messageId)
-                    .orElseThrow(() -> new IllegalArgumentException("Message not found: " + messageId));
+                    .orElseThrow(() -> new MessageNotFoundException(messageId));
         } else {
             targetMessage = messageRepository
                     .findTopByChatRoomIdOrderByIdDesc(chatRoomId)

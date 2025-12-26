@@ -10,7 +10,9 @@ import com.example.chatservice.chat.entity.UserChat;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
+import com.example.chatservice.exception.ChatRoomNotFoundException;
 import com.example.chatservice.exception.UserNotJoinedException;
+import com.example.chatservice.exception.UserNotFoundException;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.repository.MessageRepository;
@@ -70,15 +72,18 @@ public class ChatService {
             Set<Long> uniqueUserIds = new HashSet<>(userIds);
 
             for (Long userId : uniqueUserIds) {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new UserNotFoundException(userId));
+
                 UserChat userChat = UserChat.builder()
                         .chatRoom(chatRoom)
-                        .user(userRepository.findById(userId).get())
+                        .user(user)
                         .build();
                 userChatRepository.save(userChat);
 
                 // TODO:FLOW - 4.채팅방 생성 시 read_status 생성
                 ReadStatus readStatus = ReadStatus.builder()
-                        .user(userRepository.findById(userId).get())
+                        .user(user)
                         .chatRoom(chatRoom)
                         .lastReadMessage(null)
                         .build();
@@ -176,8 +181,10 @@ public class ChatService {
     @Transactional
     public void joinChatRoom(Long chatId, Long userId) {
 
-        User user = userRepository.findById(userId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+        ChatRoom chatRoom = chatRepository.findById(chatId)
+                .orElseThrow(() -> new ChatRoomNotFoundException(chatId));
         // 코드의 가독성을 좋게하기위해 예외케이스는 빨리빨리 던져버린다.
         // 이렇게 던진 에러(익셉션)을 따로 핸들링 해줘야하는가? 아닌가
 
@@ -209,11 +216,13 @@ public class ChatService {
 
     @Transactional
     public void leaveChatRoom(Long chatRoomId, Long currentUserId) {
-        User user = userRepository.findById(currentUserId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow(() -> new RuntimeException("채팅방 없음"));
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new UserNotFoundException(currentUserId));
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId)
+                .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
 
         UserChat userChat = userChatRepository.findByUserAndChatRoom(user, chatRoom)
-                .orElseThrow(() -> new RuntimeException("채팅방에 참여하지 않음"));
+                .orElseThrow(() -> new UserNotJoinedException(chatRoomId, currentUserId));
 
         userChat.leaveChatRoom();
 
