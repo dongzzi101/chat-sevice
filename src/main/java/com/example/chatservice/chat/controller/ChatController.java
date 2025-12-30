@@ -47,12 +47,10 @@ public class ChatController {
         chatService.joinChatRoom(chatId, currentUserId);
     }
 
-
     // 채팅방 나가기
     @DeleteMapping("/api/v1/chat/{chatRoomId}")
     public void leaveChat(@CurrentUser UserPrincipal userPrincipal, @PathVariable Long chatRoomId) {
         Long currentUserId = userPrincipal.getId();
-        // TODO : update chat_key
         chatService.leaveChatRoom(chatRoomId, currentUserId);
     }
 

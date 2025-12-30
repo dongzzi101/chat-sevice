@@ -12,13 +12,12 @@ import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
 import com.example.chatservice.exception.ChatRoomNotFoundException;
 import com.example.chatservice.exception.UserAlreadyJoinedException;
-import com.example.chatservice.exception.UserNotJoinedException;
 import com.example.chatservice.exception.UserNotFoundException;
+import com.example.chatservice.exception.UserNotJoinedException;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.repository.MessageRepository;
 import com.example.chatservice.user.entity.User;
 import com.example.chatservice.user.repository.UserRepository;
-import com.sun.jdi.InvalidCodeIndexException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -226,19 +225,8 @@ public class ChatService {
                 .chatRoom(chatRoom)
                 .build();
 
-
         userChatRepository.save(userChat);
-
-        List<UserChat> activeUserChats = chatRoom.getUserChats().stream()
-                .filter(uc -> uc.getLeavedAt() == null)
-                .toList();
-
-        Set<Long> activeUserIds = activeUserChats.stream()
-                .map(uc -> uc.getUser().getId())
-                .collect(Collectors.toSet());
-
-        String chatKey = createChatKey(new ArrayList<>(activeUserIds));
-        chatRoom.updateChatKey(chatKey);
+        chatKeyUpdate(chatRoom);
 
         // ReadStatus도 생성 (채팅방 참여 시 읽음 상태 초기화)
         ReadStatus existingReadStatus = readStatusRepository.findByUserAndChatRoom(user, chatRoom);
@@ -267,7 +255,10 @@ public class ChatService {
                 .orElseThrow(() -> new UserNotJoinedException(chatRoomId, currentUserId));
 
         userChat.leaveChatRoom();
+        chatKeyUpdate(chatRoom);
+    }
 
+    private void chatKeyUpdate(ChatRoom chatRoom) {
         List<UserChat> activeUserChats = chatRoom.getUserChats().stream()
                 .filter(uc -> uc.getLeavedAt() == null)
                 .toList();
@@ -278,7 +269,6 @@ public class ChatService {
 
         String chatKey = createChatKey(new ArrayList<>(activeUserIds));
         chatRoom.updateChatKey(chatKey);
-
     }
 }
 
