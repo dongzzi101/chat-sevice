@@ -45,10 +45,6 @@ public class UserChat{
         this.chatRoom = chatRoom;
     }
 
-    public void updateLastMessageId(Long lastMessageId) {
-        this.lastMessageId = lastMessageId;
-    }
-
     public void leaveChatRoom() {
         this.leavedAt = LocalDateTime.now();
     }

@@ -14,11 +14,8 @@ import java.util.Optional;
 
 @Repository
 public interface UserChatRepository extends JpaRepository<UserChat, Long> {
+/**
 
-    Optional<UserChat> findByUserAndChatRoom(User user, ChatRoom chatRoom);
-
-    @Query("SELECT uc.chatRoom FROM UserChat uc WHERE uc.user.id IN :userIds AND uc.chatRoom.type = 'DIRECT' GROUP BY uc.chatRoom HAVING COUNT(DISTINCT uc.user.id) = 2")
-    Optional<ChatRoom> findDirectChatRoomByUserIds(@Param("userIds") List<Long> userIds);
     // chat entity
     // id
     // name
@@ -32,6 +29,8 @@ public interface UserChatRepository extends JpaRepository<UserChat, Long> {
     // invite
     //             10_50_100.......
     //             update hash(...)
+
+*/
 
     @Query("SELECT uc FROM UserChat uc JOIN FETCH uc.user WHERE uc.chatRoom.id = :chatRoomId AND uc.leavedAt IS NULL")
     List<UserChat> findActiveByChatRoomWithUser(@Param("chatRoomId") Long chatRoomId);

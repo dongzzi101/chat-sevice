@@ -47,16 +47,16 @@ public class ChatService {
 
         ChatRoom chatRoom;
 
-        // TODO:FLOW - 3. 채팅방이 있는지 확인
+        // 채팅방이 있는지 확인
         ChatRoom existChatRoom = findExistChatRoom(normalizedUserIds);
 
-        // TODO:FLOW - 3.1. 있는 경우 기존 채팅방
+        // 있는 경우 기존 채팅방 반환
         if (existChatRoom != null) {
             chatRoom = existChatRoom;
 
         } else {
 
-            // TODO:FLOW - 3.2. 채팅방 없는 경우 새로운 채팅방을 생성
+            // 채팅방 없는 경우 새로운 채팅방을 생성
 
             String chatKey = createChatKey(normalizedUserIds);
 
@@ -82,9 +82,10 @@ public class ChatService {
                         .chatRoom(chatRoom)
                         .user(user)
                         .build();
+
                 userChatRepository.save(userChat);
 
-                // TODO:FLOW - 4.채팅방 생성 시 read_status 생성
+                // 채팅방 생성 시 read_status 생성
                 ReadStatus readStatus = ReadStatus.builder()
                         .user(user)
                         .chatRoom(chatRoom)
@@ -103,7 +104,6 @@ public class ChatService {
         return chatRepository.findChatRoomByChatKey(chatKey).orElse(null);
     }
 
-    // chat key 생성해주는 역할
     private String createChatKey(List<Long> userIds) {
         try {
             // 1. 정렬 + 중복 제거 + 문자열 결합
@@ -239,9 +239,10 @@ public class ChatService {
             readStatusRepository.save(readStatus);
         }
     }
-
+/**
     // @ExceptionHandler(RuntimeException.class)
     // public String test(){}
+*/
 
     @Transactional
     public void leaveChatRoom(Long chatRoomId, Long currentUserId) {
@@ -273,30 +274,27 @@ public class ChatService {
 }
 
 
-/*
-1. userchat paging 30개? (제일 최근에 메시지가 발생한 채팅방부터 30개) (최근에 가장 구매가 많았던 상품부터 30개) (별도의 정렬조건들...)
-createad id ...
+/**
+    1. userchat paging 30개? (제일 최근에 메시지가 발생한 채팅방부터 30개) (최근에 가장 구매가 많았던 상품부터 30개) (별도의 정렬조건들...)
+    createad id ...
 
-2. 해당하는 message 조회(지금은 단건씨 조회하지만, 제가 배치로 묶어서 하자... 성능)
+    2. 해당하는 message 조회(지금은 단건씨 조회하지만, 제가 배치로 묶어서 하자... 성능)
 
-3. message time 보고 user chat을 다시 내가 원하는대로 정렬해준다...
-* */
-
-/*
-11
-10
-9
-8
-7
-6
-5
-4
-3
-2
-1
-select * userchat order by id desc limit 10;
-
-select * messages in (2~11)
+    3. message time 보고 user chat을 다시 내가 원하는대로 정렬해준다...
 
 
+    11
+    10
+    9
+    8
+    7
+    6
+    5
+    4
+    3
+    2
+    1
+    select * userchat order by id desc limit 10;
+
+    select * messages in (2~11)
 */
