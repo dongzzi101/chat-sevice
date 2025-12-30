@@ -15,8 +15,6 @@ import java.util.Optional;
 @Repository
 public interface UserChatRepository extends JpaRepository<UserChat, Long> {
 
-    void deleteByUserAndChatRoom(User user, ChatRoom chatRoom);
-
     Optional<UserChat> findByUserAndChatRoom(User user, ChatRoom chatRoom);
 
     @Query("SELECT uc.chatRoom FROM UserChat uc WHERE uc.user.id IN :userIds AND uc.chatRoom.type = 'DIRECT' GROUP BY uc.chatRoom HAVING COUNT(DISTINCT uc.user.id) = 2")
@@ -34,15 +32,6 @@ public interface UserChatRepository extends JpaRepository<UserChat, Long> {
     // invite
     //             10_50_100.......
     //             update hash(...)
-    
-    @Query("SELECT uc.chatRoom FROM UserChat uc WHERE uc.user.id IN :userIds AND uc.chatRoom.type = 'GROUP' GROUP BY uc.chatRoom HAVING COUNT(DISTINCT uc.user.id) = :userCount")
-    Optional<ChatRoom> findGroupChatRoomByUserIds(@Param("userIds") List<Long> userIds, @Param("userCount") long userCount);
-
-    List<UserChat> findByUserId(Long userId);
-    
-    // 채팅방에 참여한 모든 유저 조회 (나간 유저 제외) n+1 문제 발생
-    @Query("SELECT uc FROM UserChat uc WHERE uc.chatRoom.id = :chatRoomId AND uc.leavedAt IS NULL")
-    List<UserChat> findByChatRoomIdAndLeavedAtIsNull(@Param("chatRoomId") Long chatRoomId);
 
     @Query("SELECT uc FROM UserChat uc JOIN FETCH uc.user WHERE uc.chatRoom.id = :chatRoomId AND uc.leavedAt IS NULL")
     List<UserChat> findActiveByChatRoomWithUser(@Param("chatRoomId") Long chatRoomId);
@@ -60,4 +49,8 @@ public interface UserChatRepository extends JpaRepository<UserChat, Long> {
             """)
     int updateLastMessageIdForChat(@Param("chatRoomId") Long chatRoomId,
                                    @Param("messageId") Long messageId);
+
+    boolean existsByUserAndChatRoomAndLeavedAtIsNull(User user, ChatRoom chatRoom);
+
+    Optional<UserChat> findByUserAndChatRoomAndLeavedAtIsNull(User user, ChatRoom chatRoom);
 }

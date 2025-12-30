@@ -11,6 +11,7 @@ import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
 import com.example.chatservice.exception.ChatRoomNotFoundException;
+import com.example.chatservice.exception.UserAlreadyJoinedException;
 import com.example.chatservice.exception.UserNotJoinedException;
 import com.example.chatservice.exception.UserNotFoundException;
 import com.example.chatservice.message.entity.Message;
@@ -214,13 +215,30 @@ public class ChatService {
         // 계좌의 잔액이 부족합니다
         // new 계좌잔액부족Exception();
 
+        // 이미 가입된 사람도 또 가입이 되어버리니깐 던지쟈 !
+        if (userChatRepository.existsByUserAndChatRoomAndLeavedAtIsNull(user, chatRoom)) {
+            throw new UserAlreadyJoinedException(user.getId(), chatId);
+        }
+
         UserChat userChat = UserChat
                 .builder()
                 .user(user)
                 .chatRoom(chatRoom)
                 .build();
 
+
         userChatRepository.save(userChat);
+
+        List<UserChat> activeUserChats = chatRoom.getUserChats().stream()
+                .filter(uc -> uc.getLeavedAt() == null)
+                .toList();
+
+        Set<Long> activeUserIds = activeUserChats.stream()
+                .map(uc -> uc.getUser().getId())
+                .collect(Collectors.toSet());
+
+        String chatKey = createChatKey(new ArrayList<>(activeUserIds));
+        chatRoom.updateChatKey(chatKey);
 
         // ReadStatus도 생성 (채팅방 참여 시 읽음 상태 초기화)
         ReadStatus existingReadStatus = readStatusRepository.findByUserAndChatRoom(user, chatRoom);
@@ -244,12 +262,12 @@ public class ChatService {
         ChatRoom chatRoom = chatRepository.findById(chatRoomId)
                 .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
 
-        UserChat userChat = userChatRepository.findByUserAndChatRoom(user, chatRoom)
+        UserChat userChat = userChatRepository
+                .findByUserAndChatRoomAndLeavedAtIsNull(user, chatRoom)
                 .orElseThrow(() -> new UserNotJoinedException(chatRoomId, currentUserId));
 
         userChat.leaveChatRoom();
 
-        // TODO 여기부분 공부
         List<UserChat> activeUserChats = chatRoom.getUserChats().stream()
                 .filter(uc -> uc.getLeavedAt() == null)
                 .toList();

@@ -25,6 +25,9 @@ public class ChatController {
         // 95% 유저는 원래 service 사용
         ChatResponse chatRoom = chatService.createChatRoom(id, chatRequest);
         // 5%  유저는 newChatService.createChatRoomV2();
+
+        // throw new RuntimeException("bla bla error");
+
         return chatRoom;
     }
 

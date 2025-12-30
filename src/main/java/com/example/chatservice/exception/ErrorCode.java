@@ -12,7 +12,9 @@ public enum ErrorCode {
     MESSAGE_NOT_FOUND("MESSAGE_NOT_FOUND", HttpStatus.NOT_FOUND, "Message not found"),
     USER_NOT_JOINED("USER_NOT_JOINED", HttpStatus.FORBIDDEN, "User is not joined to the chat room"),
     INVALID_REQUEST("INVALID_REQUEST", HttpStatus.BAD_REQUEST, "Invalid request"),
-    INTERNAL_ERROR("INTERNAL_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
+    INTERNAL_ERROR("INTERNAL_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error"),
+    USER_ALREADY_JOIEDD("USER_ALREADY_JOINED", HttpStatus.BAD_REQUEST, "User is already joined"),
+    ;
 
     private final String code;
     private final HttpStatus httpStatus;
