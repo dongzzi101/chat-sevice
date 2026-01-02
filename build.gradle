@@ -57,6 +57,9 @@ dependencies {
     implementation 'org.springframework.kafka:spring-kafka'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
 
+    // h2
+    testImplementation 'com.h2database:h2'
+
 }
 
 tasks.named('test') {
