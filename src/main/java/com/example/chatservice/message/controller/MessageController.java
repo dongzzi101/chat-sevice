@@ -16,13 +16,10 @@ public class MessageController {
 
     private final MessageService messageService;
 
-    // TODO : 메세지 전송 flow
     /*
      * 1. 메시지를 개인 or 단체를 보냄 (한 api 사용)
      * 2. 어차피 개인방도 챗룸을 가진다.
      */
-
-    // TODO 4 : 대화방이 있는지 확인 로직
 
     // TODO:FLOW - 5. 메시지를 /api/v1/messages/{chatRoomId}로 전송
     /*@PostMapping("/api/v1/messages/{chatRoomId}")

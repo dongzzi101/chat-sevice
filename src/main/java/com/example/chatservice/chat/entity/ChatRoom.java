@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -22,7 +23,7 @@ public class ChatRoom {
     private ChatType type; // direct, group
 
     @OneToMany(mappedBy = "chatRoom")
-    private List<UserChat> userChats;
+    private List<UserChat> userChats = new ArrayList<>();
 
     private String chatKey;
 
