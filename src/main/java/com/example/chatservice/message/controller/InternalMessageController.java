@@ -45,7 +45,7 @@ public class InternalMessageController {
 
             // SessionManager를 통해 해당 유저에게 전송
             sessionManager.sendToUser(receiverId, messageData);
-            
+
             log.info("Message delivered to user {} via WebSocket", receiverId);
 
         } catch (Exception e) {
@@ -68,7 +68,7 @@ public class InternalMessageController {
             List<Long> receiverIds = receiverIdsRaw.stream()
                     .map(Integer::longValue)
                     .toList();
-            
+
             Long messageId = Long.valueOf(request.get("messageId").toString());
             Long senderId = Long.valueOf(request.get("senderId").toString());
             String content = request.get("content").toString();
@@ -97,7 +97,7 @@ public class InternalMessageController {
                     log.error("[BATCH] Failed to send message to user {}", receiverId, e);
                 }
             }
-            
+
             log.info("[BATCH] Message delivered to {}/{} users via WebSocket", successCount, receiverIds.size());
 
         } catch (Exception e) {

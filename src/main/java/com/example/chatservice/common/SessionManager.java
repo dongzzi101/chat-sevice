@@ -22,7 +22,7 @@ public class SessionManager {
     private final Map<Long, WebSocketSession> userSessions = new ConcurrentHashMap<>();
     private final Map<Long, Object> sessionLocks = new ConcurrentHashMap<>();  // WebSocket 전송 동기화용
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
     private final ServerInfoProvider serverInfoProvider;  // 추가
 

@@ -60,6 +60,9 @@ dependencies {
     // h2
     testImplementation 'com.h2database:h2'
 
+    // redisson (delayed queue for deferred flush)
+    implementation 'org.redisson:redisson-spring-boot-starter:3.32.0'
+
 }
 
 tasks.named('test') {

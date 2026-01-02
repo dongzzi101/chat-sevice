@@ -18,14 +18,14 @@ import java.util.Map;
 @Slf4j
 public class MessageDeliveryService {
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final SessionManager sessionManager;
     private final ServerInfoProvider serverInfoProvider;
     private final RestTemplate restTemplate;
 
     public void deliverMessage(Long receiverId, Message message) {
         String redisKey = "user:" + receiverId;
-        String targetServer = redisTemplate.opsForValue().get(redisKey);
+        String targetServer = (String) redisTemplate.opsForValue().get(redisKey);
 
         log.info("Looking up user {} in Redis, found server: {}", receiverId, targetServer);
 
@@ -58,11 +58,11 @@ public class MessageDeliveryService {
     private void forwardToOtherServer(String targetServer, Long receiverId, Message message) {
         // 서버 주소가 localhost 형식인지 확인하고 필요시 변환
         String serverAddress = normalizeServerAddress(targetServer);
-        
+
         int maxRetries = 3;
         int retryCount = 0;
         boolean success = false;
-        
+
         while (retryCount < maxRetries && !success) {
             try {
                 Map<String, Object> request = new HashMap<>();
@@ -74,9 +74,9 @@ public class MessageDeliveryService {
                 request.put("sentAt", message.getCreatedAt());
 
                 String url = "http://" + serverAddress + "/internal/message";
-                
+
                 if (retryCount > 0) {
-                    log.warn("Retrying ({}/{}) to forward message to user {} via HTTP: {}", 
+                    log.warn("Retrying ({}/{}) to forward message to user {} via HTTP: {}",
                             retryCount, maxRetries, receiverId, url);
                 } else {
                     log.info("Forwarding message to user {} via HTTP: {}", receiverId, url);
@@ -88,9 +88,9 @@ public class MessageDeliveryService {
 
             } catch (Exception e) {
                 retryCount++;
-                log.error("Failed to forward message to {} for user {} (attempt {}/{}): {}", 
+                log.error("Failed to forward message to {} for user {} (attempt {}/{}): {}",
                         serverAddress, receiverId, retryCount, maxRetries, e.getMessage());
-                
+
                 if (retryCount < maxRetries) {
                     try {
                         // 재시도 전 짧은 대기
@@ -100,13 +100,13 @@ public class MessageDeliveryService {
                         break;
                     }
                 } else {
-                    log.error("Failed to forward message after {} attempts to {} for user {}", 
+                    log.error("Failed to forward message after {} attempts to {} for user {}",
                             maxRetries, serverAddress, receiverId, e);
                 }
             }
         }
     }
-    
+
     /**
      * 같은 서버에 있는 유저에게 로컬로 메시지 전송 (WebSocket)
      */
@@ -124,17 +124,18 @@ public class MessageDeliveryService {
 
     /**
      * 다른 서버로 배치로 메시지 전송
+     *
      * @param targetServer 대상 서버 주소 (예: localhost:8081)
-     * @param receiverIds 수신자 ID 목록
-     * @param message 전송할 메시지
+     * @param receiverIds  수신자 ID 목록
+     * @param message      전송할 메시지
      */
     public void deliverMessageBatch(String targetServer, List<Long> receiverIds, Message message) {
         String serverAddress = normalizeServerAddress(targetServer);
-        
+
         int maxRetries = 3;
         int retryCount = 0;
         boolean success = false;
-        
+
         while (retryCount < maxRetries && !success) {
             try {
                 Map<String, Object> request = new HashMap<>();
@@ -146,9 +147,9 @@ public class MessageDeliveryService {
                 request.put("sentAt", message.getCreatedAt());
 
                 String url = "http://" + serverAddress + "/internal/message/batch";
-                
+
                 if (retryCount > 0) {
-                    log.warn("[BATCH] Retrying ({}/{}) to forward message to {} users via HTTP: {}", 
+                    log.warn("[BATCH] Retrying ({}/{}) to forward message to {} users via HTTP: {}",
                             retryCount, maxRetries, receiverIds.size(), url);
                 } else {
                     log.info("[BATCH] Forwarding message to {} users via HTTP: {}", receiverIds.size(), url);
@@ -160,38 +161,33 @@ public class MessageDeliveryService {
 
             } catch (Exception e) {
                 retryCount++;
-                log.error("[BATCH] Failed to forward message to {} for {} users (attempt {}/{}): {}", 
+                log.error("[BATCH] Failed to forward message to {} for {} users (attempt {}/{}): {}",
                         serverAddress, receiverIds.size(), retryCount, maxRetries, e.getMessage());
-                
+
                 if (retryCount < maxRetries) {
                     try {
-                        Thread.sleep(100 * retryCount);
+                        Thread.sleep(100L * retryCount);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         break;
                     }
                 } else {
-                    log.error("[BATCH] Failed to forward message after {} attempts to {} for {} users", 
+                    log.error("[BATCH] Failed to forward message after {} attempts to {} for {} users",
                             maxRetries, serverAddress, receiverIds.size(), e);
                 }
             }
         }
     }
 
-    /**
-     * 127.0.0.1:8080 -> localhost:8080로 변환하거나 그대로 유지
-     */
     private String normalizeServerAddress(String serverAddress) {
         if (serverAddress == null || serverAddress.isEmpty()) {
             return serverAddress;
         }
-        
-        // 127.0.0.1을 localhost로 변환 (선택적)
-        // 실제 환경에서는 IP 주소를 그대로 사용하는 것이 좋을 수 있음
+
         if (serverAddress.startsWith("127.0.0.1:")) {
             return "localhost" + serverAddress.substring(9); // "127.0.0.1" 제거하고 "localhost" 추가
         }
-        
+
         return serverAddress;
     }
 }

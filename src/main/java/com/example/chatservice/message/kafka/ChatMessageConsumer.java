@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 public class ChatMessageConsumer {
 
     private final UserChatRepository userChatRepository;
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final SessionManager sessionManager;
     private final ServerInfoProvider serverInfoProvider;
 
@@ -61,13 +61,13 @@ public class ChatMessageConsumer {
                 .map(uc -> "user:" + uc.getUser().getId())
                 .collect(Collectors.toList());
             
-            List<String> servers = redisTemplate.opsForValue().multiGet(userKeys);
+            List<Object> serversRaw = redisTemplate.opsForValue().multiGet(userKeys);
             
             // 3. 내 서버에 연결된 유저만 필터링
             List<Long> myUsers = new ArrayList<>();
             for (int i = 0; i < participants.size(); i++) {
                 Long userId = participants.get(i).getUser().getId();
-                String targetServer = servers.get(i);
+                String targetServer = serversRaw.get(i) != null ? serversRaw.get(i).toString() : null;
                 
                 // 발신자는 이미 동기로 받았으므로 제외
                 if (userId.equals(event.getSenderId())) {

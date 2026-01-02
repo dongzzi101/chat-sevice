@@ -12,10 +12,6 @@ import java.util.Optional;
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
-    List<Message> findByChatRoomIdOrderByCreatedAtDesc(Long chatRoomId);
-
-    Optional<Message> findTopByChatRoomIdOrderByCreatedAtDesc(Long chatRoomId);
-
     // 특정 메시지 이후의 안읽은 메시지 개수 계산
     long countByChatRoomIdAndIdGreaterThan(Long chatRoomId, Long lastReadMessageId);
 
@@ -24,7 +20,6 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     Optional<Message> findTopByChatRoomIdOrderByIdDesc(Long id);
 
-
     List<Message> findByChatRoomIdAndIdLessThanOrderByIdDesc(
             Long chatRoomId, Long messageId, Pageable pageable);
 
@@ -32,7 +27,6 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             Long chatRoomId, Long messageId, Pageable pageable);
 
     Optional<Message> findTopByChatRoomIdOrderByIdAsc(Long chatRoomId);
-
 
     // 여러건 업데이트 쿼리
     // jpa 배치 업데이트

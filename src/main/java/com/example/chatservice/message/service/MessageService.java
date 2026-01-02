@@ -17,6 +17,7 @@ import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.event.ChatMessageEvent;
 import com.example.chatservice.message.kafka.ChatMessageProducer;
 import com.example.chatservice.message.repository.MessageRepository;
+import com.example.chatservice.message.service.PendingLastMessageFlushService;
 import com.example.chatservice.user.entity.User;
 import com.example.chatservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ import java.util.*;
 @Slf4j
 public class MessageService {
 
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final ChatRepository chatRepository;
@@ -45,6 +46,7 @@ public class MessageService {
     private final Snowflake snowflake = new Snowflake();
     private final MessageDeliveryService messageDeliveryService; // 동기 전송용
     private final ChatMessageProducer chatMessageProducer;
+    private final PendingLastMessageFlushService pendingLastMessageFlushService;
 
     private static final Duration HOT_WINDOW = Duration.ofSeconds(5);
     private static final Duration HOT_MODE_TTL = Duration.ofSeconds(30);
@@ -52,63 +54,15 @@ public class MessageService {
     private static final long HOT_ENTER_THRESHOLD = 5L;
     private static final long HOT_EXIT_THRESHOLD = 2L;
 
-
-    /*@Transactional
-    public void sendMessage(MessageRequest messageRequest, Long senderUserId, Long chatRoomId) {
-        User senderUser = userRepository.findById(senderUserId)
-                .orElseThrow(() -> new UserNotFoundException(senderUserId));
-        ChatRoom chatRoom = chatRepository.findById(chatRoomId)
-                .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
-
-        // TODO 3 : 근데 메시지 저장이 하나만 되는게 맞겠죠? 중요도 낮음
-        *//**
-         * userA -> userB :hello
-         * message : hello 저장
-         * userB는 메시지를 어떻게 가져올까 고민
-         * 나중에 메시지가 너무 많아지면 userId를 기준으로 샤드키로 잡고 샤딩을 하는건가..?
-         * 근데 메시지를 userId로 샤드키로 해두면 사용하는 의미가 잇나?
-         * 뭘로해야하는지 고민
-         *//*
-
-        Message message = Message.builder()
-                .id(snowflake.nextId())
-                .sender(senderUser)
-                .chatRoom(chatRoom)
-                .message(messageRequest.getMessage())
-                .build();
-
-        //TODO:FLOW - 6. 메시지 전송 후 read_status 상태를 업데이트 해야 함
-        ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
-
-        // ReadStatus가 없으면 생성 (joinChatRoom으로 추가된 사용자는 ReadStatus가 없을 수 있음)
-        if (senderReadStatus == null) {
-            senderReadStatus = ReadStatus.builder()
-                    .user(senderUser)
-                    .chatRoom(chatRoom)
-                    .lastReadMessage(null)
-                    .build();
-            readStatusRepository.save(senderReadStatus);
-        }
-
-        messageRepository.saveAndFlush(message);
-
-        updateUserChatLastMessage(chatRoom, message.getId());
-        senderReadStatus.updateReadMessage(message);
-    }*/
-
-    //2번
     @Transactional
     public void sendMessageViaWebSocket(Long senderId, Long receiverId,
                                         Long chatRoomId, String content) {
-        log.info("Sending message from {} in chatRoom {}", senderId, chatRoomId);
 
-        // 1. User, ChatRoom 조회
         User senderUser = userRepository.findById(senderId)
                 .orElseThrow(() -> new UserNotFoundException(senderId));
         ChatRoom chatRoom = chatRepository.findById(chatRoomId)
                 .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
 
-        // 2. DB에 메시지 저장
         Message message = Message.builder()
                 .id(snowflake.nextId())
                 .sender(senderUser)
@@ -117,14 +71,14 @@ public class MessageService {
                 .build();
 
         messageRepository.saveAndFlush(message);
-        log.info("Message saved to DB: id={}", message.getId());
 
         updateUserChatLastMessage(chatRoom, message.getId());
-        // 3. ReadStatus 업데이트 (발신자)
+
+        // ReadStatus 업데이트 (발신자)
         ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
         senderReadStatus.updateReadMessage(message);
 
-        // 4. 발신자 본인에게 즉시 전송 (동기)
+        // 발신자 본인에게 즉시 전송 (동기)
         log.info("Sending message to sender {} immediately", senderId);
         messageDeliveryService.deliverMessage(senderId, message);
 
@@ -142,16 +96,12 @@ public class MessageService {
         // update last seen ... last seen message id = 10 where last seen message id < 10;    // 11
         // 낙관적락
 
-        // 5. 다른 사용자들에게는 Kafka를 통해 비동기로 전송
-        // 트랜잭션 커밋 후 Kafka 발행
+        // 트랜잭션 커밋 후 다른 사용자들에게는 Kafka를 통해 비동기로 전송
         Long messageId = message.getId();
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        log.info("Transaction committed. Publishing message to Kafka: messageId={}", messageId);
-
-                        // Kafka로 메시지 발행
                         ChatMessageEvent event =
                                 new ChatMessageEvent(
                                         message.getId(),
@@ -162,17 +112,16 @@ public class MessageService {
                                 );
 
                         chatMessageProducer.sendMessage(event);
-                        log.info("Message published to Kafka: messageId={}", messageId);
                     }
                 }
         );
-//        MessageDto.from(message);
     }
 
     private void updateUserChatLastMessage(ChatRoom chatRoom, Long messageId) {
         boolean hotRoom = isHotRoom(chatRoom.getId());
 
         if (hotRoom && shouldSkipHotUpdate(chatRoom.getId())) {
+            pendingLastMessageFlushService.scheduleFlush(chatRoom.getId(), messageId, HOT_DEBOUNCE);
             return;
         }
 
@@ -185,7 +134,7 @@ public class MessageService {
         redisTemplate.expire(countKey, HOT_WINDOW);
 
         String modeKey = modeKey(chatRoomId);
-        String mode = redisTemplate.opsForValue().get(modeKey);
+        String mode = (String) redisTemplate.opsForValue().get(modeKey);
 
         if (count != null && count >= HOT_ENTER_THRESHOLD) {
             if (!"hot".equals(mode)) {
@@ -204,7 +153,7 @@ public class MessageService {
 
     private boolean shouldSkipHotUpdate(Long chatRoomId) {
         String lastKey = lastAppliedKey(chatRoomId);
-        String lastTs = redisTemplate.opsForValue().get(lastKey);
+        String lastTs = (String) redisTemplate.opsForValue().get(lastKey);
         long now = System.currentTimeMillis();
 
         if (lastTs != null) {

@@ -23,5 +23,22 @@ public class AsyncConfig {
         );
     }
 
+    @Bean(name = "lastMessageFlushExecutor")
+    public ExecutorService lastMessageFlushExecutor() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                1, 1,
+                0L,
+                TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(1000),
+                r -> {
+                    Thread t = new Thread(r, "last-message-flush-consumer");
+                    t.setDaemon(true);
+                    return t;
+                },
+                new ThreadPoolExecutor.DiscardPolicy()
+        );
+        executor.allowCoreThreadTimeOut(false);
 
+        return executor;
+    }
 }

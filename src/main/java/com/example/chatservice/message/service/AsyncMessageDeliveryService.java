@@ -24,7 +24,7 @@ public class AsyncMessageDeliveryService {
     private final MessageRepository messageRepository;
     private final UserChatRepository userChatRepository;
     private final MessageDeliveryService messageDeliveryService;
-    private final RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final ServerInfoProvider serverInfoProvider;
 
     @Async("messageExecutor")
@@ -78,7 +78,7 @@ public class AsyncMessageDeliveryService {
 
             // Redis에서 유저가 연결된 서버 찾기
             String redisKey = "user:" + participantId;
-            String targetServer = redisTemplate.opsForValue().get(redisKey);
+            String targetServer = (String) redisTemplate.opsForValue().get(redisKey);
 
             if (targetServer == null) {
                 // 오프라인 유저 - 스킵
