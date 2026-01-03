@@ -18,6 +18,8 @@ import com.example.chatservice.message.event.ChatMessageEvent;
 import com.example.chatservice.message.kafka.ChatMessageProducer;
 import com.example.chatservice.message.repository.MessageRepository;
 import com.example.chatservice.message.service.PendingLastMessageFlushService;
+import com.example.chatservice.sharding.Sharding;
+import com.example.chatservice.sharding.ShardingTarget;
 import com.example.chatservice.user.entity.User;
 import com.example.chatservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.util.*;
@@ -47,6 +50,7 @@ public class MessageService {
     private final MessageDeliveryService messageDeliveryService; // 동기 전송용
     private final ChatMessageProducer chatMessageProducer;
     private final PendingLastMessageFlushService pendingLastMessageFlushService;
+    private final TransactionTemplate transactionTemplate; // primary TM (main DB)
 
     private static final Duration HOT_WINDOW = Duration.ofSeconds(5);
     private static final Duration HOT_MODE_TTL = Duration.ofSeconds(30);
@@ -54,7 +58,8 @@ public class MessageService {
     private static final long HOT_ENTER_THRESHOLD = 5L;
     private static final long HOT_EXIT_THRESHOLD = 2L;
 
-    @Transactional
+    @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
+    @Transactional(transactionManager = "messageTransactionManager")
     public void sendMessageViaWebSocket(Long senderId, Long receiverId,
                                         Long chatRoomId, String content) {
 
@@ -65,8 +70,8 @@ public class MessageService {
 
         Message message = Message.builder()
                 .id(snowflake.nextId())
-                .sender(senderUser)
-                .chatRoom(chatRoom)
+                .senderId(senderUser.getId())
+                .chatRoomId(chatRoom.getId())
                 .message(content)
                 .build();
 
@@ -76,7 +81,7 @@ public class MessageService {
 
         // ReadStatus 업데이트 (발신자)
         ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
-        senderReadStatus.updateReadMessage(message);
+        senderReadStatus.updateReadMessage(message.getId());
 
         // 발신자 본인에게 즉시 전송 (동기)
         log.info("Sending message to sender {} immediately", senderId);
@@ -105,9 +110,9 @@ public class MessageService {
                         ChatMessageEvent event =
                                 new ChatMessageEvent(
                                         message.getId(),
-                                        message.getSender().getId(),
+                                        message.getSenderId(),
                                         message.getMessage(),
-                                        message.getChatRoom().getId(),
+                                        message.getChatRoomId(),
                                         message.getCreatedAt()
                                 );
 
@@ -125,7 +130,10 @@ public class MessageService {
             return;
         }
 
-        userChatRepository.updateLastMessageIdForChat(chatRoom.getId(), messageId);
+        // main DB 업데이트는 메인 TxManager로 분리 실행
+        transactionTemplate.executeWithoutResult(status ->
+                userChatRepository.updateLastMessageIdForChat(chatRoom.getId(), messageId)
+        );
     }
 
     private boolean isHotRoom(Long chatRoomId) {
@@ -183,6 +191,8 @@ public class MessageService {
         return "chat:%d:lastApplied".formatted(chatRoomId);
     }
 
+    @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
+    @Transactional(readOnly = true, transactionManager = "messageTransactionManager")
     public List<MessageResponse> getMessages(
             Long currentUserId,
             Long chatRoomId,
@@ -199,12 +209,12 @@ public class MessageService {
             ReadStatus myReadStatus = readStatusRepository
                     .findByUserAndChatRoom(currentUser, chatRoom);
 
-            if (myReadStatus != null && myReadStatus.getLastReadMessage() != null) {
+            if (myReadStatus != null && myReadStatus.getLastReadMessageId() != null) {
                 // 내가 마지막으로 읽은 메시지 기준
-                lastReadMessageId = myReadStatus.getLastReadMessage().getId();
+                lastReadMessageId = myReadStatus.getLastReadMessageId();
             } else {
                 // 처음 들어온 사람이면 첫 메시지부터
-                Message firstMessage = messageRepository
+        Message firstMessage = messageRepository
                         .findTopByChatRoomIdOrderByIdAsc(chatRoomId)
                         .orElse(null);
 
@@ -267,7 +277,7 @@ public class MessageService {
         List<MessageResponse> messageResponses = new ArrayList<>();
         for (Message message : allMessages) {
             messageResponses.add(new MessageResponse(
-                    message.getSender().getId(),
+                    message.getSenderId(),
                     message.getMessage()
             ));
         }
@@ -275,7 +285,8 @@ public class MessageService {
         return messageResponses;
     }
 
-    @Transactional
+    @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
+    @Transactional(transactionManager = "messageTransactionManager")
     public void markMessagesAsRead(Long currentUserId, Long chatRoomId, Long messageId) {
         User currentUser = userRepository.findById(currentUserId).orElseThrow();
         ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
@@ -299,14 +310,15 @@ public class MessageService {
             userReadStatus = ReadStatus.builder()
                     .user(currentUser)
                     .chatRoom(chatRoom)
-                    .lastReadMessage(null)
+                    .lastReadMessageId(null)
                     .build();
             readStatusRepository.save(userReadStatus);
         }
 
-        if (userReadStatus.getLastReadMessage() == null ||
-                targetMessage.getId() > userReadStatus.getLastReadMessage().getId()) {
-            userReadStatus.updateReadMessage(targetMessage);
+        Long targetId = targetMessage.getId();
+        if (userReadStatus.getLastReadMessageId() == null ||
+                targetId > userReadStatus.getLastReadMessageId()) {
+            userReadStatus.updateReadMessage(targetId);
         }
     }
 }

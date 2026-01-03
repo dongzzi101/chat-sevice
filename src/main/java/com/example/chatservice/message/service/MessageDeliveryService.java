@@ -42,9 +42,9 @@ public class MessageDeliveryService {
 
             Map<String, Object> messageData = new HashMap<>();
             messageData.put("messageId", message.getId());
-            messageData.put("senderId", message.getSender().getId());
+            messageData.put("senderId", message.getSenderId());
             messageData.put("content", message.getMessage());
-            messageData.put("chatRoomId", message.getChatRoom().getId());
+            messageData.put("chatRoomId", message.getChatRoomId());
             messageData.put("sentAt", message.getCreatedAt());
 
             sessionManager.sendToUser(receiverId, messageData);
@@ -68,9 +68,9 @@ public class MessageDeliveryService {
                 Map<String, Object> request = new HashMap<>();
                 request.put("receiverId", receiverId);
                 request.put("messageId", message.getId());
-                request.put("senderId", message.getSender().getId());
+                request.put("senderId", message.getSenderId());
                 request.put("content", message.getMessage());
-                request.put("chatRoomId", message.getChatRoom().getId());
+                request.put("chatRoomId", message.getChatRoomId());
                 request.put("sentAt", message.getCreatedAt());
 
                 String url = "http://" + serverAddress + "/internal/message";
@@ -113,9 +113,9 @@ public class MessageDeliveryService {
     public void deliverMessageLocally(Long receiverId, Message message) {
         Map<String, Object> messageData = new HashMap<>();
         messageData.put("messageId", message.getId());
-        messageData.put("senderId", message.getSender().getId());
+        messageData.put("senderId", message.getSenderId());
         messageData.put("content", message.getMessage());
-        messageData.put("chatRoomId", message.getChatRoom().getId());
+        messageData.put("chatRoomId", message.getChatRoomId());
         messageData.put("sentAt", message.getCreatedAt());
 
         sessionManager.sendToUser(receiverId, messageData);
@@ -141,9 +141,9 @@ public class MessageDeliveryService {
                 Map<String, Object> request = new HashMap<>();
                 request.put("receiverIds", receiverIds);  // 배열로 전송
                 request.put("messageId", message.getId());
-                request.put("senderId", message.getSender().getId());
+                request.put("senderId", message.getSenderId());
                 request.put("content", message.getMessage());
-                request.put("chatRoomId", message.getChatRoom().getId());
+                request.put("chatRoomId", message.getChatRoomId());
                 request.put("sentAt", message.getCreatedAt());
 
                 String url = "http://" + serverAddress + "/internal/message/batch";

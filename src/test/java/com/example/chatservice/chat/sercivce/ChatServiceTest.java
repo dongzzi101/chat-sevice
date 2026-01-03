@@ -188,16 +188,16 @@ class ChatServiceTest {
                 Message.builder()
                         .id(1L)
                         .message("old message")
-                        .sender(user1)
-                        .chatRoom(chatRoom1)
+                        .senderId(user1.getId())
+                        .chatRoomId(chatRoom1.getId())
                         .build()
         );
         Message newMessage = messageRepository.save(
                 Message.builder()
                         .id(2L)
                         .message("new message")
-                        .sender(user1)
-                        .chatRoom(chatRoom2)
+                        .senderId(user1.getId())
+                        .chatRoomId(chatRoom1.getId())
                         .build()
         );
 
@@ -234,7 +234,7 @@ class ChatServiceTest {
 
         ReadStatus readStatus = readStatusRepository.findByUserAndChatRoom(user3, chatRoom1);
         assertThat(readStatus).isNotNull();
-        assertThat(readStatus.getLastReadMessage()).isNull();
+        assertThat(readStatus.getLastReadMessageId()).isNull();
 
         ChatRoom newChatRoom = chatRepository.findById(chatRoom1.getId()).orElseThrow();
         assertThat(newChatRoom.getChatKey()).isNotEqualTo(beforeChatKey);

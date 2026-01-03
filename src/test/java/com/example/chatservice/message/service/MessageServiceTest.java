@@ -97,6 +97,13 @@ class MessageServiceTest {
         when(valueOps.increment(anyString())).thenReturn(1L);
         when(valueOps.get(anyString())).thenReturn(null);
         when(redisTemplate.expire(anyString(), any())).thenReturn(true);
+
+        // 클린업: 메시지 샤드/메인 엔티티 모두 정리
+        messageRepository.deleteAll();
+        readStatusRepository.deleteAll();
+        userChatRepository.deleteAll();
+        chatRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     @Test
@@ -118,14 +125,15 @@ class MessageServiceTest {
         // then
         Message saved = messageRepository.findAll().get(0);
         assertThat(saved.getMessage()).isEqualTo("hello");
-        assertThat(saved.getSender().getId()).isEqualTo(sender.getId());
-        assertThat(saved.getChatRoom().getId()).isEqualTo(chatRoomId);
+        assertThat(saved.getSenderId()).isEqualTo(sender.getId());
+        assertThat(saved.getChatRoomId()).isEqualTo(chatRoomId);
 
-        UserChat uc = userChatRepository.findByUserAndChatRoomAndLeavedAtIsNull(sender, saved.getChatRoom()).orElseThrow();
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
+        UserChat uc = userChatRepository.findByUserAndChatRoomAndLeavedAtIsNull(sender, chatRoom).orElseThrow();
         assertThat(uc.getLastMessageId()).isEqualTo(saved.getId());
 
-        ReadStatus rs = readStatusRepository.findByUserAndChatRoom(sender, saved.getChatRoom());
-        assertThat(rs.getLastReadMessage().getId()).isEqualTo(saved.getId());
+        ReadStatus rs = readStatusRepository.findByUserAndChatRoom(sender, chatRoom);
+        assertThat(rs.getLastReadMessageId()).isEqualTo(saved.getId());
 
         verify(messageDeliveryService).deliverMessage(eq(sender.getId()), any(Message.class));
         verify(chatMessageProducer).sendMessage(any(ChatMessageEvent.class));
@@ -163,9 +171,9 @@ class MessageServiceTest {
         Long chatRoomId = chatService.createChatRoom(u1.getId(), new ChatRequest(List.of(u2.getId()))).getId();
         ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
 
-        Message m1 = messageRepository.save(Message.builder().id(1L).sender(u1).chatRoom(chatRoom).message("m1").build());
-        Message m2 = messageRepository.save(Message.builder().id(2L).sender(u2).chatRoom(chatRoom).message("m2").build());
-        Message m3 = messageRepository.save(Message.builder().id(3L).sender(u1).chatRoom(chatRoom).message("m3").build());
+        Message m1 = messageRepository.save(Message.builder().id(1L).senderId(u1.getId()).chatRoomId(chatRoomId).message("m1").build());
+        Message m2 = messageRepository.save(Message.builder().id(2L).senderId(u2.getId()).chatRoomId(chatRoomId).message("m2").build());
+        Message m3 = messageRepository.save(Message.builder().id(3L).senderId(u1.getId()).chatRoomId(chatRoomId).message("m3").build());
 
         // when
         List<MessageResponse> responses = messageService.getMessages(u1.getId(), chatRoomId, m2.getId(), 1, 1);
@@ -186,17 +194,17 @@ class MessageServiceTest {
         Long chatRoomId = chatService.createChatRoom(u1.getId(), new ChatRequest(List.of(u2.getId()))).getId();
         ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
 
-        Message m1 = messageRepository.save(Message.builder().id(10L).sender(u1).chatRoom(chatRoom).message("m1").build());
-        Message m2 = messageRepository.save(Message.builder().id(20L).sender(u2).chatRoom(chatRoom).message("m2").build());
+        Message m1 = messageRepository.save(Message.builder().id(10L).senderId(u1.getId()).chatRoomId(chatRoomId).message("m1").build());
+        Message m2 = messageRepository.save(Message.builder().id(20L).senderId(u2.getId()).chatRoomId(chatRoomId).message("m2").build());
 
         // when
         messageService.markMessagesAsRead(u1.getId(), chatRoomId, m2.getId());
         ReadStatus rs = readStatusRepository.findByUserAndChatRoom(u1, chatRoom);
         assertThat(rs).isNotNull();
-        assertThat(rs.getLastReadMessage().getId()).isEqualTo(m2.getId());
+        assertThat(rs.getLastReadMessageId()).isEqualTo(m2.getId());
 
         messageService.markMessagesAsRead(u1.getId(), chatRoomId, m1.getId());
         ReadStatus rsAfter = readStatusRepository.findByUserAndChatRoom(u1, chatRoom);
-        assertThat(rsAfter.getLastReadMessage().getId()).isEqualTo(m2.getId());
+        assertThat(rsAfter.getLastReadMessageId()).isEqualTo(m2.getId());
     }
 }

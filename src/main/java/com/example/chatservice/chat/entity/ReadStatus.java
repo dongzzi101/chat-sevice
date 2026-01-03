@@ -1,6 +1,5 @@
 package com.example.chatservice.chat.entity;
 
-import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -27,18 +26,17 @@ public class ReadStatus {
     private ChatRoom chatRoom;
 
 
-    @ManyToOne
-    @JoinColumn(name = "last_read_message_id")
-    private Message lastReadMessage;
+    @Column(name = "last_read_message_id")
+    private Long lastReadMessageId;
 
     @Builder
-    public ReadStatus(User user, ChatRoom chatRoom, Message lastReadMessage) {
+    public ReadStatus(User user, ChatRoom chatRoom, Long lastReadMessageId) {
         this.user = user;
         this.chatRoom = chatRoom;
-        this.lastReadMessage = lastReadMessage;
+        this.lastReadMessageId = lastReadMessageId;
     }
 
-    public void updateReadMessage(Message message) {
-        this.lastReadMessage = message;
+    public void updateReadMessage(Long messageId) {
+        this.lastReadMessageId = messageId;
     }
 }

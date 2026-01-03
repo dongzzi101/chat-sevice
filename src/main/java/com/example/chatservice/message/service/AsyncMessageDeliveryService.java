@@ -5,11 +5,14 @@ import com.example.chatservice.chat.repository.UserChatRepository;
 import com.example.chatservice.common.ServerInfoProvider;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.repository.MessageRepository;
+import com.example.chatservice.sharding.Sharding;
+import com.example.chatservice.sharding.ShardingTarget;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,6 +31,8 @@ public class AsyncMessageDeliveryService {
     private final ServerInfoProvider serverInfoProvider;
 
     @Async("messageExecutor")
+    @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
+    @Transactional(readOnly = true, transactionManager = "messageTransactionManager")
     public void deliverMessageAsync(Long senderId, Long receiverId, Long chatRoomId, Long messageId) {
         log.info("[Async] Delivering message {} from sender {} in chatRoom {}",
                 messageId, senderId, chatRoomId);

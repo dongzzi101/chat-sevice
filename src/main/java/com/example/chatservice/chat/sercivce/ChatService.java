@@ -89,7 +89,7 @@ public class ChatService {
                 ReadStatus readStatus = ReadStatus.builder()
                         .user(user)
                         .chatRoom(chatRoom)
-                        .lastReadMessage(null)
+                        .lastReadMessageId(null)
                         .build();
                 readStatusRepository.save(readStatus);
             }
@@ -176,11 +176,11 @@ public class ChatService {
 
             // 3. 안읽은 메시지 개수 계산
             long unreadCount = 0;
-            if (myReadStatus != null && myReadStatus.getLastReadMessage() != null) {
+            if (myReadStatus != null && myReadStatus.getLastReadMessageId() != null) {
                 // 내가 읽은 메시지 이후의 메시지 개수
                 unreadCount = messageRepository.countByChatRoomIdAndIdGreaterThan(
                         chatRoom.getId(),
-                        myReadStatus.getLastReadMessage().getId()
+                        myReadStatus.getLastReadMessageId()
                 );
             } else if (lastMessage != null) {
                 // ReadStatus가 없거나 한 번도 안 읽었으면 전체 메시지가 안읽음
@@ -234,7 +234,7 @@ public class ChatService {
             ReadStatus readStatus = ReadStatus.builder()
                     .user(user)
                     .chatRoom(chatRoom)
-                    .lastReadMessage(null)
+                    .lastReadMessageId(null)
                     .build();
             readStatusRepository.save(readStatus);
         }
