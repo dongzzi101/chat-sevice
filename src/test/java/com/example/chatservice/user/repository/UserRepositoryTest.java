@@ -1,6 +1,7 @@
 package com.example.chatservice.user.repository;
 
 import com.example.chatservice.user.entity.User;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,17 +22,22 @@ class UserRepositoryTest {
     @DisplayName("유저이름으로 유저를 찾을 수 있다.")
     void findByUsername() {
         // given
+        String givenName = "userA";
+
         User user1 = User.builder()
-                .username("userA")
+                .username(givenName)
                 .build();
 
         userRepository.save(user1);
 
         // when
-        User findUser = userRepository.findByUsername("userA");
+        User findUser = userRepository.findByUsername(givenName);
 
         // then
         assertThat(findUser).isEqualTo(user1);
+        assertThat(findUser)
+                .extracting("username")
+                .isEqualTo(givenName);
     }
 
     @Test
