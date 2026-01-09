@@ -5,7 +5,7 @@ import com.example.chatservice.chat.controller.reponse.ChatRoomResponse;
 import com.example.chatservice.chat.controller.request.ChatRequest;
 import com.example.chatservice.chat.entity.ChatType;
 import com.example.chatservice.chat.sercivce.ChatService;
-import com.example.chatservice.config.CurrentUserArgumentResolver;
+import com.example.chatservice.config.WebMvcTestConfig;
 import com.example.chatservice.user.UserPrincipal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,13 +13,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.method.support.HandlerMethodArgumentResolver;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,16 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ChatController.class)
-@ContextConfiguration(classes = {ChatController.class, ChatControllerTest.TestConfig.class})
+@ContextConfiguration(classes = {ChatController.class, WebMvcTestConfig.class})
 class ChatControllerTest {
-
-    @Configuration
-    static class TestConfig implements WebMvcConfigurer {
-        @Override
-        public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
-            resolvers.add(new CurrentUserArgumentResolver());
-        }
-    }
 
     @Autowired
     private MockMvc mockMvc;
