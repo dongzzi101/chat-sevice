@@ -30,9 +30,8 @@ public class UserController {
     }
 
     @PostMapping("/api/v1/users/login")
-    public UserLoginResponse loginUser(@RequestBody UserLoginRequest userLoginRequest) {
-        UserLoginResponse userLoginResponse = userService.login(userLoginRequest);
-        return userLoginResponse;
+    public ApiResponse<UserLoginResponse> loginUser(@Valid @RequestBody UserLoginRequest userLoginRequest) {
+        return ApiResponse.ok(userService.login(userLoginRequest));
     }
 
     // TODO:FLOW - 1. 사용자 목록을 보여줌
