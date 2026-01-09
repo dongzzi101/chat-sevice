@@ -1,8 +1,8 @@
 package com.example.chatservice.chat.sercivce;
 
 import com.example.chatservice.chat.controller.request.ChatRequest;
-import com.example.chatservice.chat.controller.request.ChatResponse;
-import com.example.chatservice.chat.controller.request.ChatRoomResponse;
+import com.example.chatservice.chat.controller.reponse.ChatResponse;
+import com.example.chatservice.chat.controller.reponse.ChatRoomResponse;
 import com.example.chatservice.chat.entity.ChatRoom;
 import com.example.chatservice.chat.entity.ChatType;
 import com.example.chatservice.chat.entity.ReadStatus;

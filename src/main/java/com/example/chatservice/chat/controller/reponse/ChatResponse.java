@@ -1,7 +1,6 @@
-package com.example.chatservice.chat.controller.request;
+package com.example.chatservice.chat.controller.reponse;
 
 import com.example.chatservice.chat.entity.ChatType;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 

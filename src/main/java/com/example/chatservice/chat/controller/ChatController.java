@@ -1,10 +1,10 @@
 package com.example.chatservice.chat.controller;
 
 import com.example.chatservice.chat.controller.request.ChatRequest;
-import com.example.chatservice.chat.controller.request.ChatResponse;
-import com.example.chatservice.chat.controller.request.ChatRoomResponse;
+import com.example.chatservice.chat.controller.reponse.ChatResponse;
+import com.example.chatservice.chat.controller.reponse.ChatRoomResponse;
 import com.example.chatservice.chat.sercivce.ChatService;
-import com.example.chatservice.message.controller.request.MessageRequest;
+import com.example.chatservice.common.response.ApiResponse;
 import com.example.chatservice.user.CurrentUser;
 import com.example.chatservice.user.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ public class ChatController {
 
     // 채팅방 만들기
     @PostMapping("/api/v1/chat")
-    public ChatResponse createChatRoom(@CurrentUser UserPrincipal userPrincipal, @RequestBody ChatRequest chatRequest) {
+    public ApiResponse<ChatResponse> createChatRoom(@CurrentUser UserPrincipal userPrincipal, @RequestBody ChatRequest chatRequest) {
         Long currentUserId = getCurrentUserId(userPrincipal);
 
 /**
@@ -28,14 +28,14 @@ public class ChatController {
         // 5%  유저는 newChatService.createChatRoomV2();
         // throw new RuntimeException("bla bla error");
 */
-        return chatService.createChatRoom(currentUserId, chatRequest);
+        return ApiResponse.ok(chatService.createChatRoom(currentUserId, chatRequest));
     }
 
     // 내 채팅방 리스트 조회
     @GetMapping("/api/v1/chats")
-    public List<ChatRoomResponse> getChatRooms(@CurrentUser UserPrincipal userPrincipal) {
+    public ApiResponse<List<ChatRoomResponse>> getChatRooms(@CurrentUser UserPrincipal userPrincipal) {
         Long currentUserId = getCurrentUserId(userPrincipal);
-        return chatService.getChatRooms(currentUserId);
+        return ApiResponse.ok(chatService.getChatRooms(currentUserId));
     }
 
     // 채팅방 가입
