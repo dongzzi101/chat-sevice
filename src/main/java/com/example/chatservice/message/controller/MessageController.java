@@ -1,5 +1,6 @@
 package com.example.chatservice.message.controller;
 
+import com.example.chatservice.common.response.ApiResponse;
 import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.service.MessageService;
@@ -38,5 +39,10 @@ public class MessageController {
         messageService.markMessagesAsRead(currentUserId, chatRoomId, messageId);
     }
 
-
+    /*
+    public void getUser(){
+        return new ApiResponse<User>();
+        return ApiResponse.Ok();
+    }
+     */
 }

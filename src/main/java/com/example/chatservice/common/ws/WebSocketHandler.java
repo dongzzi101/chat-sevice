@@ -27,9 +27,8 @@ public class WebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         try {
-            // 쿼리 파라미터에서 userId, chatRoomId 추출
             Long userId = extractUserId(session);
-            Long chatRoomId = extractChatRoomId(session); // 선택적
+            Long chatRoomId = extractChatRoomId(session);
 
             // Session에 userId, chatRoomId 저장
             session.getAttributes().put("userId", userId);

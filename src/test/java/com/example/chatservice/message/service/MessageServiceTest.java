@@ -22,12 +22,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.mock.mockito.SpyBean;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -43,60 +40,45 @@ import static org.mockito.Mockito.when;
 @Transactional
 class MessageServiceTest {
 
-    /**
-     * 1. 메시지 보내기
-     * 1-1. 정상 전송
-     * 1-2. 동기/비동기 호출
-     * 1-3. hot room 분기 되는지
-     * ------------------------
-     * 2. 메시지 읽기
-     * 2-1. 메시지 잘 가져오는지
-     * ------------------------
-     * 3. 읽음 처리
-     */
-
-    @MockBean
-    RedisTemplate<String, Object> redisTemplate;
-
-    @MockBean
+    @MockitoBean
     MessageDeliveryService messageDeliveryService;
 
-    @MockBean
+    @MockitoBean
     ChatMessageProducer chatMessageProducer;
 
-    @MockBean
+    @MockitoBean
     PendingLastMessageFlushService pendingLastMessageFlushService;
 
-    @MockBean
-    RedisConnectionFactory redisConnectionFactory;
+    @MockitoBean
+    HotRoomDetectionService hotRoomDetectionService;
 
     @Autowired
     MessageService messageService;
+
     @Autowired
     UserRepository userRepository;
+
     @Autowired
     ChatRepository chatRepository;
+
     @Autowired
     ChatService chatService;
+
     @Autowired
     MessageRepository messageRepository;
+
     @Autowired
     ReadStatusRepository readStatusRepository;
+
     @SpyBean
     UserChatRepository userChatRepository;
 
-    ValueOperations<String, Object> valueOps;
-    static final String MODE_KEY_PREFIX = "chat:%d:mode";
-    static final String COUNT_KEY_PREFIX = "chat:%d:msgCount";
-    static final String LAST_APPLIED_PREFIX = "chat:%d:lastApplied";
-
     @BeforeEach
     void setUp() {
-        valueOps = Mockito.mock(ValueOperations.class);
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        when(valueOps.increment(anyString())).thenReturn(1L);
-        when(valueOps.get(anyString())).thenReturn(null);
-        when(redisTemplate.expire(anyString(), any())).thenReturn(true);
+        // 기본적으로 hot room이 아니라고 설정
+        when(hotRoomDetectionService.isHotRoom(anyLong())).thenReturn(false);
+        when(hotRoomDetectionService.shouldSkipHotUpdate(anyLong())).thenReturn(false);
+        when(hotRoomDetectionService.getDebounceDuration()).thenReturn(java.time.Duration.ofSeconds(3));
 
         // 클린업: 메시지 샤드/메인 엔티티 모두 정리
         messageRepository.deleteAll();
@@ -147,9 +129,9 @@ class MessageServiceTest {
         User other = userRepository.save(User.builder().username("userB").build());
         Long chatRoomId = chatService.createChatRoom(sender.getId(), new ChatRequest(List.of(other.getId()))).getId();
 
-        when(valueOps.increment(COUNT_KEY_PREFIX.formatted(chatRoomId))).thenReturn(10L);
-        when(valueOps.get(MODE_KEY_PREFIX.formatted(chatRoomId))).thenReturn("hot");
-        when(valueOps.get(LAST_APPLIED_PREFIX.formatted(chatRoomId))).thenReturn(String.valueOf(System.currentTimeMillis()));
+        when(hotRoomDetectionService.isHotRoom(chatRoomId)).thenReturn(true);
+        when(hotRoomDetectionService.shouldSkipHotUpdate(chatRoomId)).thenReturn(true);
+        when(hotRoomDetectionService.getDebounceDuration()).thenReturn(java.time.Duration.ofSeconds(3));
 
         // when
         messageService.sendMessageViaWebSocket(sender.getId(), other.getId(), chatRoomId, "hot");

@@ -25,14 +25,12 @@ import com.example.chatservice.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Duration;
 import java.util.*;
 
 @Service
@@ -40,7 +38,6 @@ import java.util.*;
 @Slf4j
 public class MessageService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final ChatRepository chatRepository;
@@ -50,13 +47,8 @@ public class MessageService {
     private final MessageDeliveryService messageDeliveryService; // 동기 전송용
     private final ChatMessageProducer chatMessageProducer;
     private final PendingLastMessageFlushService pendingLastMessageFlushService;
+    private final HotRoomDetectionService hotRoomDetectionService;
     private final TransactionTemplate transactionTemplate; // primary TM (main DB)
-
-    private static final Duration HOT_WINDOW = Duration.ofSeconds(5);
-    private static final Duration HOT_MODE_TTL = Duration.ofSeconds(30);
-    private static final Duration HOT_DEBOUNCE = Duration.ofSeconds(3);
-    private static final long HOT_ENTER_THRESHOLD = 5L;
-    private static final long HOT_EXIT_THRESHOLD = 2L;
 
     @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
     @Transactional(transactionManager = "messageTransactionManager")
@@ -123,72 +115,26 @@ public class MessageService {
     }
 
     private void updateUserChatLastMessage(ChatRoom chatRoom, Long messageId) {
-        boolean hotRoom = isHotRoom(chatRoom.getId());
+        boolean hotRoom = hotRoomDetectionService.isHotRoom(chatRoom.getId());
 
-        if (hotRoom && shouldSkipHotUpdate(chatRoom.getId())) {
-            pendingLastMessageFlushService.scheduleFlush(chatRoom.getId(), messageId, HOT_DEBOUNCE);
+        if (hotRoom && hotRoomDetectionService.shouldSkipHotUpdate(chatRoom.getId())) {
+            // 핫모드이고 debounce 시간 내 → 스케줄링
+            pendingLastMessageFlushService.scheduleFlush(
+                    chatRoom.getId(), 
+                    messageId, 
+                    hotRoomDetectionService.getDebounceDuration()
+            );
             return;
         }
 
+        // 핫모드가 아니거나 debounce가 끝남 → 즉시 DB 업데이트
+        // 핫모드에서 쿨모드로 전환된 경우, 남아있는 pending도 함께 flush
+        pendingLastMessageFlushService.flushIfPending(chatRoom.getId());
+        
         // main DB 업데이트는 메인 TxManager로 분리 실행
         transactionTemplate.executeWithoutResult(status ->
                 userChatRepository.updateLastMessageIdForChat(chatRoom.getId(), messageId)
         );
-    }
-
-    private boolean isHotRoom(Long chatRoomId) {
-        String countKey = msgCountKey(chatRoomId);
-        Long count = redisTemplate.opsForValue().increment(countKey);
-        redisTemplate.expire(countKey, HOT_WINDOW);
-
-        String modeKey = modeKey(chatRoomId);
-        String mode = (String) redisTemplate.opsForValue().get(modeKey);
-
-        if (count != null && count >= HOT_ENTER_THRESHOLD) {
-            if (!"hot".equals(mode)) {
-                redisTemplate.opsForValue().set(modeKey, "hot", HOT_MODE_TTL);
-            }
-            return true;
-        }
-
-        if ("hot".equals(mode) && count != null && count <= HOT_EXIT_THRESHOLD) {
-            redisTemplate.opsForValue().set(modeKey, "cool", HOT_MODE_TTL);
-            return false;
-        }
-
-        return "hot".equals(mode);
-    }
-
-    private boolean shouldSkipHotUpdate(Long chatRoomId) {
-        String lastKey = lastAppliedKey(chatRoomId);
-        String lastTs = (String) redisTemplate.opsForValue().get(lastKey);
-        long now = System.currentTimeMillis();
-
-        if (lastTs != null) {
-            try {
-                long last = Long.parseLong(lastTs);
-                if (now - last < HOT_DEBOUNCE.toMillis()) {
-                    return true;
-                }
-            } catch (NumberFormatException e) {
-                log.warn("Invalid last applied timestamp for chatRoomId={}", chatRoomId);
-            }
-        }
-
-        redisTemplate.opsForValue().set(lastKey, String.valueOf(now), HOT_MODE_TTL);
-        return false;
-    }
-
-    private String msgCountKey(Long chatRoomId) {
-        return "chat:%d:msgCount".formatted(chatRoomId);
-    }
-
-    private String modeKey(Long chatRoomId) {
-        return "chat:%d:mode".formatted(chatRoomId);
-    }
-
-    private String lastAppliedKey(Long chatRoomId) {
-        return "chat:%d:lastApplied".formatted(chatRoomId);
     }
 
     @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")

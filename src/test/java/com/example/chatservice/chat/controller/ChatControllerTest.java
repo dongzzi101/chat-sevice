@@ -72,6 +72,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.message").value("OK"))
                 .andExpect(jsonPath("$.data.id").value(1L))
                 .andExpect(jsonPath("$.data.type").value("DIRECT"));
+        // TODO : 잘 불리는지 - verify test
     }
 
     @Test
