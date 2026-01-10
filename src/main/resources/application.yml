@@ -10,13 +10,19 @@ spring:
 
   jpa:
     hibernate:
-      # ddl-auto: none
+#       ddl-auto: none
       ddl-auto: create
     show-sql: true
     properties:
       hibernate:
         format_sql: true
     database-platform: org.hibernate.dialect.MySQL8Dialect
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
 
   kafka:
     bootstrap-servers: localhost:9092
@@ -51,3 +57,21 @@ management:
   metrics:
     tags:
       application: my-app
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  sql:
+    init:
+      mode: never

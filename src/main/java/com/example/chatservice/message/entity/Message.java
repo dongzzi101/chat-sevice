@@ -1,8 +1,9 @@
 package com.example.chatservice.message.entity;
 
-import com.example.chatservice.chat.entity.ChatRoom;
-import com.example.chatservice.user.entity.User;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,21 +22,21 @@ public class Message {
 
     private String message;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    private User sender;
+    @Column(name = "sender_id")
+    private Long senderId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    private ChatRoom chatRoom;
+    @Column(name = "chat_room_id")
+    private Long chatRoomId;
 
     @CreatedDate
     private LocalDateTime createdAt;
 
     @Builder
-    public Message(Long id, String message, User sender, ChatRoom chatRoom) {
+    public Message(Long id, String message, Long senderId, Long chatRoomId) {
         this.id = id;
         this.message = message;
-        this.sender = sender;
-        this.chatRoom = chatRoom;
+        this.senderId = senderId;
+        this.chatRoomId = chatRoomId;
         this.createdAt = LocalDateTime.now();
     }
 }

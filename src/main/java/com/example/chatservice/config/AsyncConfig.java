@@ -35,7 +35,7 @@ public class AsyncConfig {
                     t.setDaemon(true);
                     return t;
                 },
-                new ThreadPoolExecutor.DiscardPolicy()
+                new ThreadPoolExecutor.AbortPolicy()
         );
         executor.allowCoreThreadTimeOut(false);
 

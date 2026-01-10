@@ -1,5 +1,6 @@
 package com.example.chatservice.chat.controller.request;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -11,6 +12,7 @@ public class ChatRequest {
 
     private List<Long> userIds;
 
+    @Builder
     public ChatRequest(List<Long> userIds) {
         this.userIds = userIds;
     }

@@ -1,10 +1,9 @@
-package com.example.chatservice.chat.controller.request;
+package com.example.chatservice.chat.controller.reponse;
 
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
-import java.util.function.Predicate;
 
 @Getter
 public class ChatRoomResponse {
