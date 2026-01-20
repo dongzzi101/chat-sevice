@@ -23,6 +23,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -73,6 +74,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1L))
                 .andExpect(jsonPath("$.data.type").value("DIRECT"));
         // TODO : 잘 불리는지 - verify test
+        verify(chatService, times(1)).createChatRoom(any(Long.class), any(ChatRequest.class));
     }
 
     @Test
@@ -97,6 +99,8 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.message").value("OK"))
                 .andExpect(jsonPath("$.data.id").value(1L))
                 .andExpect(jsonPath("$.data.type").value("GROUP"));
+
+        verify(chatService, times(1)).createChatRoom(any(Long.class), any(ChatRequest.class));
     }
 
     @Test
@@ -121,6 +125,8 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.message").value("OK"))
                 .andExpect(jsonPath("$.data.id").value(1L))
                 .andExpect(jsonPath("$.data.type").value("IM"));
+
+        verify(chatService, times(1)).createChatRoom(any(Long.class), any(ChatRequest.class));
     }
 
 
@@ -153,6 +159,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data[0].lastMessage").value("안녕하세요"));
 
         verify(chatService).getChatRooms(1L);
+        verify(chatService, times(1)).getChatRooms(1L);
     }
 
     @Test
