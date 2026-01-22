@@ -1,7 +1,5 @@
 package com.example.chatservice.message.controller;
 
-import com.example.chatservice.common.response.ApiResponse;
-import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.service.MessageService;
 import com.example.chatservice.user.CurrentUser;

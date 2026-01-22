@@ -40,13 +40,7 @@ public class MessageDeliveryService {
         if (targetServer.equals(currentServer)) {
             log.info("User {} is on the same server. Sending directly.", receiverId);
 
-            Map<String, Object> messageData = new HashMap<>();
-            messageData.put("messageId", message.getId());
-            messageData.put("senderId", message.getSenderId());
-            messageData.put("content", message.getMessage());
-            messageData.put("chatRoomId", message.getChatRoomId());
-            messageData.put("sentAt", message.getCreatedAt());
-
+            Map<String, Object> messageData = createMessageData(message);
             sessionManager.sendToUser(receiverId, messageData);
             log.info("Message sent directly to user {}", receiverId);
         } else {
@@ -65,13 +59,8 @@ public class MessageDeliveryService {
 
         while (retryCount < maxRetries && !success) {
             try {
-                Map<String, Object> request = new HashMap<>();
+                Map<String, Object> request = createMessageData(message);
                 request.put("receiverId", receiverId);
-                request.put("messageId", message.getId());
-                request.put("senderId", message.getSenderId());
-                request.put("content", message.getMessage());
-                request.put("chatRoomId", message.getChatRoomId());
-                request.put("sentAt", message.getCreatedAt());
 
                 String url = "http://" + serverAddress + "/internal/message";
 
@@ -111,23 +100,13 @@ public class MessageDeliveryService {
      * 같은 서버에 있는 유저에게 로컬로 메시지 전송 (WebSocket)
      */
     public void deliverMessageLocally(Long receiverId, Message message) {
-        Map<String, Object> messageData = new HashMap<>();
-        messageData.put("messageId", message.getId());
-        messageData.put("senderId", message.getSenderId());
-        messageData.put("content", message.getMessage());
-        messageData.put("chatRoomId", message.getChatRoomId());
-        messageData.put("sentAt", message.getCreatedAt());
-
+        Map<String, Object> messageData = createMessageData(message);
         sessionManager.sendToUser(receiverId, messageData);
         log.info("Message sent locally to user {}", receiverId);
     }
 
     /**
      * 다른 서버로 배치로 메시지 전송
-     *
-     * @param targetServer 대상 서버 주소 (예: localhost:8081)
-     * @param receiverIds  수신자 ID 목록
-     * @param message      전송할 메시지
      */
     public void deliverMessageBatch(String targetServer, List<Long> receiverIds, Message message) {
         String serverAddress = normalizeServerAddress(targetServer);
@@ -138,13 +117,8 @@ public class MessageDeliveryService {
 
         while (retryCount < maxRetries && !success) {
             try {
-                Map<String, Object> request = new HashMap<>();
+                Map<String, Object> request = createMessageData(message);
                 request.put("receiverIds", receiverIds);  // 배열로 전송
-                request.put("messageId", message.getId());
-                request.put("senderId", message.getSenderId());
-                request.put("content", message.getMessage());
-                request.put("chatRoomId", message.getChatRoomId());
-                request.put("sentAt", message.getCreatedAt());
 
                 String url = "http://" + serverAddress + "/internal/message/batch";
 
@@ -177,6 +151,16 @@ public class MessageDeliveryService {
                 }
             }
         }
+    }
+
+    private Map<String, Object> createMessageData(Message message) {
+        Map<String, Object> messageData = new HashMap<>();
+        messageData.put("messageId", message.getId());
+        messageData.put("senderId", message.getSenderId());
+        messageData.put("content", message.getMessage());
+        messageData.put("chatRoomId", message.getChatRoomId());
+        messageData.put("sentAt", message.getCreatedAt());
+        return messageData;
     }
 
     private String normalizeServerAddress(String serverAddress) {
