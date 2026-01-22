@@ -1,7 +1,9 @@
 package com.example.chatservice.message.service;
 
+import com.example.chatservice.property.HotRoomProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -10,33 +12,32 @@ import java.time.Duration;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@EnableConfigurationProperties(HotRoomProperty.class)
 public class HotRoomDetectionService {
 
     private final RedisTemplate<String, Object> redisTemplate;
-
-    private static final Duration HOT_WINDOW = Duration.ofSeconds(5);
-    private static final Duration HOT_MODE_TTL = Duration.ofSeconds(30);
-    private static final Duration HOT_DEBOUNCE = Duration.ofSeconds(3);
-    private static final long HOT_ENTER_THRESHOLD = 5L;
-    private static final long HOT_EXIT_THRESHOLD = 2L;
+    private final HotRoomProperty hotRoomProperty;
 
     public boolean isHotRoom(Long chatRoomId) {
+        Duration hotWindow = Duration.ofSeconds(hotRoomProperty.getWindowSeconds());
+        Duration hotModeTtl = Duration.ofSeconds(hotRoomProperty.getModeTtlSeconds());
+        
         String countKey = msgCountKey(chatRoomId);
         Long count = redisTemplate.opsForValue().increment(countKey);
-        redisTemplate.expire(countKey, HOT_WINDOW);
+        redisTemplate.expire(countKey, hotWindow);
 
         String modeKey = modeKey(chatRoomId);
         String mode = (String) redisTemplate.opsForValue().get(modeKey);
 
-        if (count != null && count >= HOT_ENTER_THRESHOLD) {
+        if (count != null && count >= hotRoomProperty.getEnterThreshold()) {
             if (!"hot".equals(mode)) {
-                redisTemplate.opsForValue().set(modeKey, "hot", HOT_MODE_TTL);
+                redisTemplate.opsForValue().set(modeKey, "hot", hotModeTtl);
             }
             return true;
         }
 
-        if ("hot".equals(mode) && count != null && count <= HOT_EXIT_THRESHOLD) {
-            redisTemplate.opsForValue().set(modeKey, "cool", HOT_MODE_TTL);
+        if ("hot".equals(mode) && count != null && count <= hotRoomProperty.getExitThreshold()) {
+            redisTemplate.opsForValue().set(modeKey, "cool", hotModeTtl);
             return false;
         }
 
@@ -44,6 +45,9 @@ public class HotRoomDetectionService {
     }
 
     public boolean shouldSkipHotUpdate(Long chatRoomId) {
+        Duration hotDebounce = Duration.ofSeconds(hotRoomProperty.getDebounceSeconds());
+        Duration hotModeTtl = Duration.ofSeconds(hotRoomProperty.getModeTtlSeconds());
+        
         String lastKey = lastAppliedKey(chatRoomId);
         String lastTs = (String) redisTemplate.opsForValue().get(lastKey);
         long now = System.currentTimeMillis();
@@ -51,7 +55,7 @@ public class HotRoomDetectionService {
         if (lastTs != null) {
             try {
                 long last = Long.parseLong(lastTs);
-                if (now - last < HOT_DEBOUNCE.toMillis()) {
+                if (now - last < hotDebounce.toMillis()) {
                     return true;
                 }
             } catch (NumberFormatException e) {
@@ -59,12 +63,12 @@ public class HotRoomDetectionService {
             }
         }
 
-        redisTemplate.opsForValue().set(lastKey, String.valueOf(now), HOT_MODE_TTL);
+        redisTemplate.opsForValue().set(lastKey, String.valueOf(now), hotModeTtl);
         return false;
     }
 
     public Duration getDebounceDuration() {
-        return HOT_DEBOUNCE;
+        return Duration.ofSeconds(hotRoomProperty.getDebounceSeconds());
     }
 
     private String msgCountKey(Long chatRoomId) {
