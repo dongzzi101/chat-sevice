@@ -5,19 +5,16 @@ import com.example.chatservice.chat.entity.ReadStatus;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
-import com.example.chatservice.common.ServerInfoProvider;
-import com.example.chatservice.common.SessionManager;
+import com.example.chatservice.chat.service.ReadStatusService;
 import com.example.chatservice.common.snowflake.Snowflake;
 import com.example.chatservice.exception.ChatRoomNotFoundException;
 import com.example.chatservice.exception.MessageNotFoundException;
 import com.example.chatservice.exception.UserNotFoundException;
-import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.event.ChatMessageEvent;
 import com.example.chatservice.message.kafka.ChatMessageProducer;
 import com.example.chatservice.message.repository.MessageRepository;
-import com.example.chatservice.message.service.PendingLastMessageFlushService;
 import com.example.chatservice.sharding.Sharding;
 import com.example.chatservice.sharding.ShardingTarget;
 import com.example.chatservice.user.entity.User;
@@ -31,7 +28,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +42,7 @@ public class MessageService {
     private final ChatRepository chatRepository;
     private final ReadStatusRepository readStatusRepository;
     private final UserChatRepository userChatRepository;
+    private final ReadStatusService readStatusService;
     private final Snowflake snowflake = new Snowflake();
     private final MessageDeliveryService messageDeliveryService; // 동기 전송용
     private final ChatMessageProducer chatMessageProducer;
@@ -72,16 +72,7 @@ public class MessageService {
         updateUserChatLastMessage(chatRoom, message.getId());
 
         // ReadStatus 업데이트 (발신자)
-        ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
-        if (senderReadStatus == null) {
-            // ReadStatus가 없으면 생성 (채팅방 참여 시 생성되지 않은 경우 대비)
-            senderReadStatus = ReadStatus.builder()
-                    .user(senderUser)
-                    .chatRoom(chatRoom)
-                    .lastReadMessageId(null)
-                    .build();
-            readStatusRepository.save(senderReadStatus);
-        }
+        ReadStatus senderReadStatus = readStatusService.getOrCreateReadStatus(senderUser, chatRoom);
         senderReadStatus.updateReadMessage(message.getId());
 
         // 발신자 본인에게 즉시 전송 (동기)
@@ -260,15 +251,7 @@ public class MessageService {
             return; // 채팅방에 메시지가 없으면 아무 것도 하지 않음
         }
 
-        ReadStatus userReadStatus = readStatusRepository.findByUserAndChatRoom(currentUser, chatRoom);
-        if (userReadStatus == null) {
-            userReadStatus = ReadStatus.builder()
-                    .user(currentUser)
-                    .chatRoom(chatRoom)
-                    .lastReadMessageId(null)
-                    .build();
-            readStatusRepository.save(userReadStatus);
-        }
+        ReadStatus userReadStatus = readStatusService.getOrCreateReadStatus(currentUser, chatRoom);
 
         Long targetId = targetMessage.getId();
         if (userReadStatus.getLastReadMessageId() == null ||

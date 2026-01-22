@@ -10,6 +10,7 @@ import com.example.chatservice.chat.entity.UserChat;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
+import com.example.chatservice.chat.service.ReadStatusService;
 import com.example.chatservice.exception.ChatRoomNotFoundException;
 import com.example.chatservice.exception.UserAlreadyJoinedException;
 import com.example.chatservice.exception.UserNotFoundException;
@@ -37,6 +38,7 @@ public class ChatService {
     private final UserChatRepository userChatRepository;
     private final ReadStatusRepository readStatusRepository;
     private final MessageRepository messageRepository;
+    private final ReadStatusService readStatusService;
 
     @Transactional
     public ChatResponse createChatRoom(Long currentUserId, ChatRequest chatRequest) {
@@ -86,12 +88,7 @@ public class ChatService {
                 userChatRepository.save(userChat);
 
                 // 채팅방 생성 시 read_status 생성
-                ReadStatus readStatus = ReadStatus.builder()
-                        .user(user)
-                        .chatRoom(chatRoom)
-                        .lastReadMessageId(null)
-                        .build();
-                readStatusRepository.save(readStatus);
+                readStatusService.getOrCreateReadStatus(user, chatRoom);
             }
 
         }
@@ -229,15 +226,7 @@ public class ChatService {
         chatKeyUpdate(chatRoom);
 
         // ReadStatus도 생성 (채팅방 참여 시 읽음 상태 초기화)
-        ReadStatus existingReadStatus = readStatusRepository.findByUserAndChatRoom(user, chatRoom);
-        if (existingReadStatus == null) {
-            ReadStatus readStatus = ReadStatus.builder()
-                    .user(user)
-                    .chatRoom(chatRoom)
-                    .lastReadMessageId(null)
-                    .build();
-            readStatusRepository.save(readStatus);
-        }
+        readStatusService.getOrCreateReadStatus(user, chatRoom);
     }
 /**
     // @ExceptionHandler(RuntimeException.class)
