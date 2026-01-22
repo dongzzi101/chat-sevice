@@ -7,7 +7,7 @@ import com.example.chatservice.chat.entity.UserChat;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
-import com.example.chatservice.chat.sercivce.ChatService;
+import com.example.chatservice.chat.service.ChatService;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.event.ChatMessageEvent;

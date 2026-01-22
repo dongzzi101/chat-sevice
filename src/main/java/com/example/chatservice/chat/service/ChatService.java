@@ -1,4 +1,4 @@
-package com.example.chatservice.chat.sercivce;
+package com.example.chatservice.chat.service;
 
 import com.example.chatservice.chat.controller.request.ChatRequest;
 import com.example.chatservice.chat.controller.reponse.ChatResponse;
@@ -10,7 +10,6 @@ import com.example.chatservice.chat.entity.UserChat;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
-import com.example.chatservice.chat.service.ReadStatusService;
 import com.example.chatservice.exception.ChatRoomNotFoundException;
 import com.example.chatservice.exception.UserAlreadyJoinedException;
 import com.example.chatservice.exception.UserNotFoundException;

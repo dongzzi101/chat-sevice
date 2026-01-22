@@ -1,6 +1,6 @@
 package com.example.chatservice.message.controller;
 
-import com.example.chatservice.chat.sercivce.ChatService;
+import com.example.chatservice.chat.service.ChatService;
 import com.example.chatservice.config.WebMvcTestConfig;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.service.MessageService;

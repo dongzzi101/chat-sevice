@@ -10,6 +10,7 @@ import com.example.chatservice.chat.entity.UserChat;
 import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
+import com.example.chatservice.chat.service.ChatService;
 import com.example.chatservice.exception.UserAlreadyJoinedException;
 import com.example.chatservice.exception.UserNotFoundException;
 import com.example.chatservice.exception.UserNotJoinedException;

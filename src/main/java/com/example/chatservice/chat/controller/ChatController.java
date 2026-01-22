@@ -3,7 +3,7 @@ package com.example.chatservice.chat.controller;
 import com.example.chatservice.chat.controller.request.ChatRequest;
 import com.example.chatservice.chat.controller.reponse.ChatResponse;
 import com.example.chatservice.chat.controller.reponse.ChatRoomResponse;
-import com.example.chatservice.chat.sercivce.ChatService;
+import com.example.chatservice.chat.service.ChatService;
 import com.example.chatservice.common.response.ApiResponse;
 import com.example.chatservice.user.CurrentUser;
 import com.example.chatservice.user.UserPrincipal;
