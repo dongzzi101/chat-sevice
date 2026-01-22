@@ -73,6 +73,15 @@ public class MessageService {
 
         // ReadStatus 업데이트 (발신자)
         ReadStatus senderReadStatus = readStatusRepository.findByUserAndChatRoom(senderUser, chatRoom);
+        if (senderReadStatus == null) {
+            // ReadStatus가 없으면 생성 (채팅방 참여 시 생성되지 않은 경우 대비)
+            senderReadStatus = ReadStatus.builder()
+                    .user(senderUser)
+                    .chatRoom(chatRoom)
+                    .lastReadMessageId(null)
+                    .build();
+            readStatusRepository.save(senderReadStatus);
+        }
         senderReadStatus.updateReadMessage(message.getId());
 
         // 발신자 본인에게 즉시 전송 (동기)

@@ -30,8 +30,8 @@ app:
       min-idle: 0
     message:
       username: sa
-      password: ''
-      driver-class-name: org.h2.Driver
+
+
       max-pool-size: 2
       min-idle: 0
       shard0:

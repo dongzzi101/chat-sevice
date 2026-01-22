@@ -46,6 +46,28 @@ token:
   token-time: 300
   refresh-token-time: 300
 
+app:
+  datasource:
+    main:
+      username: ${DB_MAIN_USERNAME:root}
+      password: ${DB_MAIN_PASSWORD:mySql1313}
+      url: ${DB_MAIN_URL:jdbc:mysql://localhost:3306/chat_service}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      max-pool-size: 20
+      min-idle: 5
+    
+    message:
+      username: ${DB_MESSAGE_USERNAME:root}
+      password: ${DB_MESSAGE_PASSWORD:mySql1313}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      max-pool-size: 20
+      min-idle: 5
+      shards:
+        - key: shard-0
+          url: ${DB_MESSAGE_SHARD0_URL:jdbc:mysql://localhost:3306/messagedb1}
+        - key: shard-1
+          url: ${DB_MESSAGE_SHARD1_URL:jdbc:mysql://localhost:3306/messagedb2}
+
 server:
   port: 8080
 
