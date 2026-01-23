@@ -24,7 +24,7 @@ public class SessionManager {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
-    private final ServerInfoProvider serverInfoProvider;  // 추가
+    private final ServerInfoProvider serverInfoProvider;
 
     public void addSession(Long userId, WebSocketSession session) {
         try {

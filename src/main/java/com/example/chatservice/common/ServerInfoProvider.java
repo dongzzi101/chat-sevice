@@ -21,11 +21,7 @@ public class ServerInfoProvider {
     @PostConstruct
     public void init() {
         try {
-            // localhost를 사용하여 일관성 유지
-            // 실제 운영 환경에서는 환경 변수나 설정 파일에서 가져오는 것이 좋음
             this.serverAddress = "localhost:" + port;
-            
-            // IP 주소도 로깅용으로 가져오기
             String ip = InetAddress.getLocalHost().getHostAddress();
             
             log.info("========================================");

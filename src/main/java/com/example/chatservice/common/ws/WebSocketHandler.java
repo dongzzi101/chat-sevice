@@ -127,59 +127,49 @@ public class WebSocketHandler extends TextWebSocketHandler {
     }
 
     private Long extractUserId(WebSocketSession session) {
-        try {
-            URI uri = session.getUri();
-            if (uri == null) {
-                throw new IllegalArgumentException("WebSocket URI is null");
-            }
-            
-            String query = uri.getQuery(); // "userId=1&chatRoomId=2" or "userId=1"
-
-            if (query != null && !query.isEmpty()) {
-                String[] params = query.split("&");
-                for (String param : params) {
-                    if (param.startsWith("userId=")) {
-                        String userIdStr = param.substring("userId=".length());
-                        if (userIdStr.isEmpty()) {
-                            throw new IllegalArgumentException("userId value is empty");
-                        }
-                        return Long.parseLong(userIdStr);
-                    }
-                }
-            }
-
+        String userIdStr = extractQueryParameter(session, "userId");
+        if (userIdStr == null || userIdStr.isEmpty()) {
             throw new IllegalArgumentException("userId is required in query parameter. Format: ws://host/chat?userId=X&chatRoomId=Y");
+        }
+        try {
+            return Long.parseLong(userIdStr);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("userId must be a valid number", e);
         }
     }
     
     private Long extractChatRoomId(WebSocketSession session) {
+        String chatRoomIdStr = extractQueryParameter(session, "chatRoomId");
+        if (chatRoomIdStr == null || chatRoomIdStr.isEmpty()) {
+            return null;
+        }
         try {
-            URI uri = session.getUri();
-            if (uri == null) {
-                return null;
-            }
-            
-            String query = uri.getQuery(); // "userId=1&chatRoomId=2"
-
-            if (query != null && !query.isEmpty()) {
-                String[] params = query.split("&");
-                for (String param : params) {
-                    if (param.startsWith("chatRoomId=")) {
-                        String chatRoomIdStr = param.substring("chatRoomId=".length());
-                        if (chatRoomIdStr.isEmpty()) {
-                            return null;
-                        }
-                        return Long.parseLong(chatRoomIdStr);
-                    }
-                }
-            }
-
-            return null; // chatRoomId는 선택적
+            return Long.parseLong(chatRoomIdStr);
         } catch (NumberFormatException e) {
             log.warn("Invalid chatRoomId format, ignoring: {}", e.getMessage());
             return null; // chatRoomId는 선택적이므로 예외를 던지지 않음
         }
+    }
+
+    private String extractQueryParameter(WebSocketSession session, String paramName) {
+        URI uri = session.getUri();
+        if (uri == null) {
+            return null;
+        }
+        
+        String query = uri.getQuery(); // "userId=1&chatRoomId=2" or "userId=1"
+        if (query == null || query.isEmpty()) {
+            return null;
+        }
+
+        String[] params = query.split("&");
+        for (String param : params) {
+            if (param.startsWith(paramName + "=")) {
+                String value = param.substring((paramName + "=").length());
+                return value.isEmpty() ? null : value;
+            }
+        }
+        
+        return null;
     }
 }
