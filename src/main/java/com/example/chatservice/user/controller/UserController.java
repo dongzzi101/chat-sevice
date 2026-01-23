@@ -36,9 +36,8 @@ public class UserController {
 
     // TODO:FLOW - 1. 사용자 목록을 보여줌
     @GetMapping("/api/v1/users")
-    public List<UserResponse> getUsers() {
-        List<UserResponse> users = userService.getUsers();
-        return users;
+    public ApiResponse<List<UserResponse>> getUsers() {
+        return ApiResponse.ok(userService.getUsers());
     }
 }
 // 추가로 이미지 업로드 (사진전송)

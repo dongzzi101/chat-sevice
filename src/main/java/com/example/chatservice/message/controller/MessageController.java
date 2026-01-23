@@ -1,5 +1,6 @@
 package com.example.chatservice.message.controller;
 
+import com.example.chatservice.common.response.ApiResponse;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.service.MessageService;
 import com.example.chatservice.user.CurrentUser;
@@ -16,7 +17,7 @@ public class MessageController {
     private final MessageService messageService;
 
     @GetMapping("/api/v1/messages/{chatRoomId}")
-    public List<MessageResponse> getMessages(
+    public ApiResponse<List<MessageResponse>> getMessages(
             @CurrentUser UserPrincipal userPrincipal,
             @PathVariable Long chatRoomId,
             @RequestParam(required = false) Long lastReadMessageId,
@@ -24,17 +25,18 @@ public class MessageController {
             @RequestParam(defaultValue = "3") int after
     ) {
         Long currentUserId = userPrincipal.getId();
-        return messageService.getMessages(currentUserId, chatRoomId, lastReadMessageId, before, after);
+        return ApiResponse.ok(messageService.getMessages(currentUserId, chatRoomId, lastReadMessageId, before, after));
     }
 
     @PostMapping("/api/v1/messages/{chatRoomId}/read")
-    public void readMessage(
+    public ApiResponse<Void> readMessage(
             @CurrentUser UserPrincipal userPrincipal,
             @PathVariable Long chatRoomId,
             @RequestParam(required = false) Long messageId
     ) {
         Long currentUserId = userPrincipal.getId();
         messageService.markMessagesAsRead(currentUserId, chatRoomId, messageId);
+        return ApiResponse.ok(null);
     }
 
     /*

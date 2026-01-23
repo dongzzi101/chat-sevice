@@ -40,16 +40,18 @@ public class ChatController {
 
     // 채팅방 가입
     @PostMapping("/api/v1/chat/{chatId}")
-    public void joinChat(@CurrentUser UserPrincipal userPrincipal, @PathVariable Long chatId) {
+    public ApiResponse<Void> joinChat(@CurrentUser UserPrincipal userPrincipal, @PathVariable Long chatId) {
         Long currentUserId = getCurrentUserId(userPrincipal);
         chatService.joinChatRoom(chatId, currentUserId);
+        return ApiResponse.ok(null);
     }
 
     // 채팅방 나가기
     @DeleteMapping("/api/v1/chat/{chatRoomId}")
-    public void leaveChat(@CurrentUser UserPrincipal userPrincipal, @PathVariable Long chatRoomId) {
+    public ApiResponse<Void> leaveChat(@CurrentUser UserPrincipal userPrincipal, @PathVariable Long chatRoomId) {
         Long currentUserId = getCurrentUserId(userPrincipal);
         chatService.leaveChatRoom(chatRoomId, currentUserId);
+        return ApiResponse.ok(null);
     }
 
     private static Long getCurrentUserId(@CurrentUser UserPrincipal userPrincipal) {

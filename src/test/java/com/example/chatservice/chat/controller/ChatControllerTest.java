@@ -171,7 +171,10 @@ class ChatControllerTest {
         // when & then
         mockMvc.perform(post("/api/v1/chat/{chatId}", chatRoomId)
                         .requestAttr("userPrincipal", testUserPrincipal))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.status").value("OK"))
+                .andExpect(jsonPath("$.message").value("OK"));
 
         verify(chatService).joinChatRoom(chatRoomId, testUserPrincipal.getId());
     }
@@ -186,7 +189,10 @@ class ChatControllerTest {
         mockMvc.perform(
                         delete("/api/v1/chat/{chatRoomId}", chatRoomId)
                                 .requestAttr("userPrincipal", testUserPrincipal))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.status").value("OK"))
+                .andExpect(jsonPath("$.message").value("OK"));
 
         verify(chatService).leaveChatRoom(chatRoomId, testUserPrincipal.getId());
     }

@@ -19,11 +19,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MessageController.class)
@@ -60,7 +62,7 @@ class MessageControllerTest {
         List<MessageResponse> messageResponses = List.of(messageResponse);
 
         given(messageService.getMessages(
-                any(Long.class), any(Long.class), any(Long.class), any(Integer.class), any(Integer.class)
+                eq(testUserPrincipal.getId()), eq(chatRoomId), any(), any(Integer.class), any(Integer.class)
         ))
                 .willReturn(messageResponses);
 
@@ -69,7 +71,19 @@ class MessageControllerTest {
         mockMvc.perform(get("/api/v1/messages/{chatRoomId}", chatRoomId)
                         .requestAttr("userPrincipal", testUserPrincipal))
                 .andDo(print())
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.status").value("OK"))
+                .andExpect(jsonPath("$.message").value("OK"))
+                .andExpect(jsonPath("$.data").exists())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].message").value("hello"))
+                .andExpect(jsonPath("$.data[0].senderId").value(1L));
+
+        verify(messageService).getMessages(
+                eq(testUserPrincipal.getId()), eq(chatRoomId), any(), any(Integer.class), any(Integer.class)
+        );
     }
 
     @ParameterizedTest
@@ -111,7 +125,10 @@ class MessageControllerTest {
                         .requestAttr("userPrincipal", testUserPrincipal)
                         .queryParam("messageId", messageId.toString()))
                 .andDo(print())
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.status").value("OK"))
+                .andExpect(jsonPath("$.message").value("OK"));
 
         verify(messageService)
                 .markMessagesAsRead(testUserPrincipal.getId(), chatRoomId, messageId);
