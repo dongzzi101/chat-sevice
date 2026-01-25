@@ -6,9 +6,8 @@ import com.example.chatservice.chat.repository.ChatRepository;
 import com.example.chatservice.chat.repository.ReadStatusRepository;
 import com.example.chatservice.chat.repository.UserChatRepository;
 import com.example.chatservice.chat.service.ReadStatusService;
-import com.example.chatservice.common.snowflake.Snowflake;
+import com.example.chatservice.component.snowflake.Snowflake;
 import com.example.chatservice.exception.ChatRoomNotFoundException;
-import com.example.chatservice.exception.MessageNotFoundException;
 import com.example.chatservice.exception.UserNotFoundException;
 import com.example.chatservice.message.controller.response.MessageResponse;
 import com.example.chatservice.message.entity.Message;
@@ -43,7 +42,7 @@ public class MessageService {
     private final ReadStatusRepository readStatusRepository;
     private final UserChatRepository userChatRepository;
     private final ReadStatusService readStatusService;
-    private final Snowflake snowflake = new Snowflake();
+    private final Snowflake snowflake;
     private final MessageDeliveryService messageDeliveryService; // 동기 전송용
     private final ChatMessageProducer chatMessageProducer;
     private final PendingLastMessageFlushService pendingLastMessageFlushService;
