@@ -71,9 +71,8 @@ public class MessageService {
 
         updateUserChatLastMessage(chatRoom, message.getId());
 
-        // ReadStatus 업데이트 (발신자)
-        ReadStatus senderReadStatus = readStatusService.getOrCreateReadStatus(senderUser, chatRoom);
-        senderReadStatus.updateReadMessage(message.getId());
+        // ReadStatus 업데이트 (발신자) - Main DB 트랜잭션으로 분리
+        updateSenderReadStatus(senderUser.getId(), chatRoom.getId(), message.getId());
 
         // 발신자 본인에게 즉시 전송 (동기)
         log.info("Sending message to sender {} immediately", senderId);
@@ -135,6 +134,26 @@ public class MessageService {
         transactionTemplate.executeWithoutResult(status ->
                 userChatRepository.updateLastMessageIdForChat(chatRoom.getId(), messageId)
         );
+    }
+
+    /**
+     * 발신자의 ReadStatus 업데이트 (Main DB 트랜잭션으로 분리)
+     */
+    private void updateSenderReadStatus(Long senderId, Long chatRoomId, Long messageId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            User senderUser = userRepository.findById(senderId)
+                    .orElseThrow(() -> new UserNotFoundException(senderId));
+            ChatRoom chatRoom = chatRepository.findById(chatRoomId)
+                    .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
+            
+            ReadStatus senderReadStatus = readStatusService.getOrCreateReadStatus(senderUser, chatRoom);
+            Long currentLastRead = senderReadStatus.getLastReadMessageId();
+            
+            // 새로운 메시지만 업데이트 (뒤로 가지 않음)
+            if (currentLastRead == null || messageId > currentLastRead) {
+                senderReadStatus.updateReadMessage(messageId);
+            }
+        });
     }
 
     @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
@@ -231,16 +250,23 @@ public class MessageService {
         return messageResponses;
     }
 
+    /**
+     * 메시지 읽음 처리
+     * Message는 Message Shard DB에서 조회하고, ReadStatus는 Main DB에서 업데이트
+     */
     @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
-    @Transactional(transactionManager = "messageTransactionManager")
+    @Transactional(readOnly = true, transactionManager = "messageTransactionManager")
     public void markMessagesAsRead(Long currentUserId, Long chatRoomId, Long messageId) {
-        User currentUser = userRepository.findById(currentUserId).orElseThrow();
-        ChatRoom chatRoom = chatRepository.findById(chatRoomId).orElseThrow();
-
+        // 1. Message 조회 (Message Shard DB)
         Message targetMessage;
         if (messageId != null) {
-            targetMessage = messageRepository.findById(messageId)
-                    .orElseThrow(() -> new MessageNotFoundException(messageId));
+            targetMessage = messageRepository.findById(messageId).orElse(null);
+            if (targetMessage == null) {
+                log.warn("Message not found for ACK: messageId={}, userId={}, chatRoomId={}. " +
+                        "This may happen if messageId is incorrect or message was deleted.", 
+                        messageId, currentUserId, chatRoomId);
+                return; // 메시지가 없으면 읽음 처리하지 않음
+            }
         } else {
             targetMessage = messageRepository
                     .findTopByChatRoomIdOrderByIdDesc(chatRoomId)
@@ -248,15 +274,32 @@ public class MessageService {
         }
 
         if (targetMessage == null) {
+            log.warn("No messages found in chatRoomId={} for userId={}", chatRoomId, currentUserId);
             return; // 채팅방에 메시지가 없으면 아무 것도 하지 않음
         }
 
-        ReadStatus userReadStatus = readStatusService.getOrCreateReadStatus(currentUser, chatRoom);
+        // 2. ReadStatus 업데이트 (Main DB 트랜잭션으로 분리)
+        Long targetMessageId = targetMessage.getId();
+        updateReadStatus(currentUserId, chatRoomId, targetMessageId);
+    }
 
-        Long targetId = targetMessage.getId();
-        if (userReadStatus.getLastReadMessageId() == null ||
-                targetId > userReadStatus.getLastReadMessageId()) {
-            userReadStatus.updateReadMessage(targetId);
-        }
+    /**
+     * ReadStatus 업데이트 (Main DB 트랜잭션으로 분리)
+     */
+    private void updateReadStatus(Long userId, Long chatRoomId, Long messageId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new UserNotFoundException(userId));
+            ChatRoom chatRoom = chatRepository.findById(chatRoomId)
+                    .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
+            
+            ReadStatus userReadStatus = readStatusService.getOrCreateReadStatus(user, chatRoom);
+            Long currentLastRead = userReadStatus.getLastReadMessageId();
+            
+            // 새로운 메시지만 업데이트 (뒤로 가지 않음)
+            if (currentLastRead == null || messageId > currentLastRead) {
+                userReadStatus.updateReadMessage(messageId);
+            }
+        });
     }
 }
