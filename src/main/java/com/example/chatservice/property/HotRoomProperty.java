@@ -10,9 +10,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Getter
 @ConfigurationProperties(prefix = "app.hot-room")
 public class HotRoomProperty {
-    private int windowSeconds = 5;
-    private int modeTtlSeconds = 30;
-    private int debounceSeconds = 3;
-    private long enterThreshold = 5L;
-    private long exitThreshold = 2L;
+    private int windowSeconds;
+    private int modeTtlSeconds;
+    private int debounceSeconds;
+    private long enterThreshold;
+    private long exitThreshold;
 }
