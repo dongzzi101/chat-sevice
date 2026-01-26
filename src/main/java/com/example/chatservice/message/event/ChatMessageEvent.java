@@ -19,7 +19,7 @@ public class ChatMessageEvent {
     private Long senderId;
     private String content;
     private Long chatRoomId;
-    private LocalDateTime sentAt;
+    private LocalDateTime createdAt;
 }
 
 

@@ -1,6 +1,7 @@
 package com.example.chatservice.user.entity;
 
 import com.example.chatservice.chat.entity.UserChat;
+import com.example.chatservice.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -12,7 +13,7 @@ import java.util.List;
 @Getter
 @NoArgsConstructor
 @Table(name = "users")
-public class User {
+public class User extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

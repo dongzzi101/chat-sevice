@@ -6,8 +6,14 @@ import com.example.chatservice.jwt.JWTProvider;
 import com.example.chatservice.user.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.util.Collections;
 
 @Component
 public class LoginCheckInterceptor implements HandlerInterceptor {
@@ -32,6 +38,14 @@ public class LoginCheckInterceptor implements HandlerInterceptor {
 
             UserPrincipal userPrincipal = new UserPrincipal(userId, username);
             request.setAttribute("userPrincipal", userPrincipal);
+
+            Authentication authentication = new UsernamePasswordAuthenticationToken(
+                    userPrincipal,
+                    null,
+                    Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+            );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
 
             return true;
 

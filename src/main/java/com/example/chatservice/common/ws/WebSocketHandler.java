@@ -2,10 +2,15 @@ package com.example.chatservice.common.ws;
 
 import com.example.chatservice.common.SessionManager;
 import com.example.chatservice.message.service.MessageService;
+import com.example.chatservice.user.UserPrincipal;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -13,6 +18,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.Map;
 
 @Component
@@ -62,6 +68,15 @@ public class WebSocketHandler extends TextWebSocketHandler {
         String payload = message.getPayload();
 
         log.info("Received message from user {}: {}", senderId, payload);
+
+        // Security Context 설정
+        UserPrincipal userPrincipal = new UserPrincipal(senderId, "username"); // username은 필요시 조회
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userPrincipal,
+                null,
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
         try {
             // chatRoomId는 세션에서 먼저 확인

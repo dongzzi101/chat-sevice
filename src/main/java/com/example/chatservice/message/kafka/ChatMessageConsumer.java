@@ -90,7 +90,7 @@ public class ChatMessageConsumer {
                 "senderId", event.getSenderId(),
                 "content", event.getContent(),
                 "chatRoomId", event.getChatRoomId(),
-                "sentAt", event.getSentAt().toString()
+                "createdAt", event.getCreatedAt()
             );
             
             int successCount = 0;

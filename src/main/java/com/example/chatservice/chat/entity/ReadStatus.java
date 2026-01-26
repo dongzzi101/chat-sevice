@@ -1,5 +1,6 @@
 package com.example.chatservice.chat.entity;
 
+import com.example.chatservice.common.BaseEntity;
 import com.example.chatservice.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -11,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @Table(name = "read_status")
-public class ReadStatus {
+public class ReadStatus extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

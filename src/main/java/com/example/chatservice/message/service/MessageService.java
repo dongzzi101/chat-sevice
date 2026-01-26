@@ -27,6 +27,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -77,22 +78,9 @@ public class MessageService {
         log.info("Sending message to sender {} immediately", senderId);
         messageDeliveryService.deliverMessage(senderId, message);
 
-        // TODO : userChat lastMessageId를 업데이트를 어떻게 할 까?
-        // 읽음처리 요 부분도 트래픽관점에서 무거울 수 있는 비슷한 이유가 있는데
-        // 1000명방
-        // 공구이벤트중이어서 1000명이 다 접속중
-        // 이 상황에서 메시지를 1건보내면
-        // 1000명한테서 읽음처리요청이 들어옴
-        // 100 * 1000
-
-        // 엔티티 꼭 찝어서 가져와서 업데이트
-        // vs
-        // @Modifiying. ... update ...
-        // update last seen ... last seen message id = 10 where last seen message id < 10;    // 11
-        // 낙관적락
-
         // 트랜잭션 커밋 후 다른 사용자들에게는 Kafka를 통해 비동기로 전송
         Long messageId = message.getId();
+        LocalDateTime createdAt = message.getCreatedAt();
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override
@@ -273,7 +261,6 @@ public class MessageService {
         }
 
         if (targetMessage == null) {
-            log.warn("No messages found in chatRoomId={} for userId={}", chatRoomId, currentUserId);
             return; // 채팅방에 메시지가 없으면 아무 것도 하지 않음
         }
 

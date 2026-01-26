@@ -1,5 +1,6 @@
 package com.example.chatservice.message.entity;
 
+import com.example.chatservice.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
