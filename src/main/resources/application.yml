@@ -75,6 +75,12 @@ app:
     enter-threshold: 5
     exit-threshold: 2
 
+message:
+  forward:
+    retry:
+      max-retries: 3
+      base-delay-ms: 100
+
 server:
   port: 8080
 

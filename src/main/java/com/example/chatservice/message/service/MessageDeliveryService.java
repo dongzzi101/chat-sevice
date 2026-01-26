@@ -3,8 +3,11 @@ package com.example.chatservice.message.service;
 import com.example.chatservice.common.ServerInfoProvider;
 import com.example.chatservice.common.SessionManager;
 import com.example.chatservice.message.entity.Message;
+import com.example.chatservice.property.MessageForwardRetryProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -12,16 +15,22 @@ import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@EnableConfigurationProperties(MessageForwardRetryProperty.class)
 public class MessageDeliveryService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final SessionManager sessionManager;
     private final ServerInfoProvider serverInfoProvider;
     private final RestTemplate restTemplate;
+    @Qualifier("retryScheduler")
+    private final ScheduledExecutorService retryScheduler;
+    private final MessageForwardRetryProperty retryProperty;
 
     public void deliverMessage(Long receiverId, Message message) {
         String redisKey = "user:" + receiverId;
@@ -50,48 +59,45 @@ public class MessageDeliveryService {
     }
 
     private void forwardToOtherServer(String targetServer, Long receiverId, Message message) {
+        forwardToOtherServerWithRetry(targetServer, receiverId, message, 0);
+    }
+
+    private void forwardToOtherServerWithRetry(String targetServer, Long receiverId, Message message, int retryCount) {
         // 서버 주소가 localhost 형식인지 확인하고 필요시 변환
         String serverAddress = normalizeServerAddress(targetServer);
+        int maxRetries = retryProperty.getMaxRetries();
 
-        int maxRetries = 3;
-        int retryCount = 0;
-        boolean success = false;
+        try {
+            Map<String, Object> request = createMessageData(message);
+            request.put("receiverId", receiverId);
 
-        while (retryCount < maxRetries && !success) {
-            try {
-                Map<String, Object> request = createMessageData(message);
-                request.put("receiverId", receiverId);
+            String url = "http://" + serverAddress + "/internal/message";
 
-                String url = "http://" + serverAddress + "/internal/message";
+            if (retryCount > 0) {
+                log.warn("Retrying ({}/{}) to forward message to user {} via HTTP: {}",
+                        retryCount, maxRetries, receiverId, url);
+            } else {
+                log.info("Forwarding message to user {} via HTTP: {}", receiverId, url);
+            }
 
-                if (retryCount > 0) {
-                    log.warn("Retrying ({}/{}) to forward message to user {} via HTTP: {}",
-                            retryCount, maxRetries, receiverId, url);
-                } else {
-                    log.info("Forwarding message to user {} via HTTP: {}", receiverId, url);
-                }
+            restTemplate.postForObject(url, request, Void.class);
+            log.info("Message forwarded successfully to {} for user {}", serverAddress, receiverId);
 
-                restTemplate.postForObject(url, request, Void.class);
-                log.info("Message forwarded successfully to {} for user {}", serverAddress, receiverId);
-                success = true;
+        } catch (Exception e) {
+            retryCount++;
+            final int nextRetryCount = retryCount; // 람다에서 사용하기 위해 final 변수로 복사
+            log.error("Failed to forward message to {} for user {} (attempt {}/{}): {}",
+                    serverAddress, receiverId, retryCount, maxRetries, e.getMessage());
 
-            } catch (Exception e) {
-                retryCount++;
-                log.error("Failed to forward message to {} for user {} (attempt {}/{}): {}",
-                        serverAddress, receiverId, retryCount, maxRetries, e.getMessage());
-
-                if (retryCount < maxRetries) {
-                    try {
-                        // 재시도 전 짧은 대기
-                        Thread.sleep(100 * retryCount); // 100ms, 200ms, 300ms
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                } else {
-                    log.error("Failed to forward message after {} attempts to {} for user {}",
-                            maxRetries, serverAddress, receiverId, e);
-                }
+            if (retryCount < maxRetries) {
+                // ScheduledExecutorService를 사용하여 비동기로 재시도 (메인 스레드 블로킹 방지)
+                long delayMs = retryProperty.getBaseDelayMs() * retryCount;
+                retryScheduler.schedule(() -> {
+                    forwardToOtherServerWithRetry(targetServer, receiverId, message, nextRetryCount);
+                }, delayMs, TimeUnit.MILLISECONDS);
+            } else {
+                log.error("Failed to forward message after {} attempts to {} for user {}",
+                        maxRetries, serverAddress, receiverId, e);
             }
         }
     }
@@ -109,46 +115,44 @@ public class MessageDeliveryService {
      * 다른 서버로 배치로 메시지 전송
      */
     public void deliverMessageBatch(String targetServer, List<Long> receiverIds, Message message) {
+        deliverMessageBatchWithRetry(targetServer, receiverIds, message, 0);
+    }
+
+    private void deliverMessageBatchWithRetry(String targetServer, List<Long> receiverIds, Message message, int retryCount) {
         String serverAddress = normalizeServerAddress(targetServer);
+        int maxRetries = retryProperty.getMaxRetries();
 
-        int maxRetries = 3;
-        int retryCount = 0;
-        boolean success = false;
+        try {
+            Map<String, Object> request = createMessageData(message);
+            request.put("receiverIds", receiverIds);  // 배열로 전송
 
-        while (retryCount < maxRetries && !success) {
-            try {
-                Map<String, Object> request = createMessageData(message);
-                request.put("receiverIds", receiverIds);  // 배열로 전송
+            String url = "http://" + serverAddress + "/internal/message/batch";
 
-                String url = "http://" + serverAddress + "/internal/message/batch";
+            if (retryCount > 0) {
+                log.warn("[BATCH] Retrying ({}/{}) to forward message to {} users via HTTP: {}",
+                        retryCount, maxRetries, receiverIds.size(), url);
+            } else {
+                log.info("[BATCH] Forwarding message to {} users via HTTP: {}", receiverIds.size(), url);
+            }
 
-                if (retryCount > 0) {
-                    log.warn("[BATCH] Retrying ({}/{}) to forward message to {} users via HTTP: {}",
-                            retryCount, maxRetries, receiverIds.size(), url);
-                } else {
-                    log.info("[BATCH] Forwarding message to {} users via HTTP: {}", receiverIds.size(), url);
-                }
+            restTemplate.postForObject(url, request, Void.class);
+            log.info("[BATCH] Message forwarded successfully to {} for {} users", serverAddress, receiverIds.size());
 
-                restTemplate.postForObject(url, request, Void.class);
-                log.info("[BATCH] Message forwarded successfully to {} for {} users", serverAddress, receiverIds.size());
-                success = true;
+        } catch (Exception e) {
+            retryCount++;
+            final int nextRetryCount = retryCount; // 람다에서 사용하기 위해 final 변수로 복사
+            log.error("[BATCH] Failed to forward message to {} for {} users (attempt {}/{}): {}",
+                    serverAddress, receiverIds.size(), retryCount, maxRetries, e.getMessage());
 
-            } catch (Exception e) {
-                retryCount++;
-                log.error("[BATCH] Failed to forward message to {} for {} users (attempt {}/{}): {}",
-                        serverAddress, receiverIds.size(), retryCount, maxRetries, e.getMessage());
-
-                if (retryCount < maxRetries) {
-                    try {
-                        Thread.sleep(100L * retryCount);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                } else {
-                    log.error("[BATCH] Failed to forward message after {} attempts to {} for {} users",
-                            maxRetries, serverAddress, receiverIds.size(), e);
-                }
+            if (retryCount < maxRetries) {
+                // ScheduledExecutorService를 사용하여 비동기로 재시도 (메인 스레드 블로킹 방지)
+                long delayMs = retryProperty.getBaseDelayMs() * retryCount;
+                retryScheduler.schedule(() -> {
+                    deliverMessageBatchWithRetry(targetServer, receiverIds, message, nextRetryCount);
+                }, delayMs, TimeUnit.MILLISECONDS);
+            } else {
+                log.error("[BATCH] Failed to forward message after {} attempts to {} for {} users",
+                        maxRetries, serverAddress, receiverIds.size(), e);
             }
         }
     }

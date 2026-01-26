@@ -25,7 +25,6 @@ import java.util.regex.Pattern;
  * 핫 구간에서 스킵된 lastMessageId를 지연 플러시로 밀어 넣는 전용 컴포넌트.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class PendingLastMessageFlushService {
 
@@ -36,9 +35,20 @@ public class PendingLastMessageFlushService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final UserChatRepository userChatRepository;
     private final TransactionTemplate transactionTemplate;
-
-    @Qualifier("lastMessageFlushExecutor")
     private final ExecutorService consumerExecutor;
+
+    public PendingLastMessageFlushService(
+            RedissonClient redissonClient,
+            RedisTemplate<String, Object> redisTemplate,
+            UserChatRepository userChatRepository,
+            TransactionTemplate transactionTemplate,
+            @Qualifier("lastMessageFlushExecutor") ExecutorService consumerExecutor) {
+        this.redissonClient = redissonClient;
+        this.redisTemplate = redisTemplate;
+        this.userChatRepository = userChatRepository;
+        this.transactionTemplate = transactionTemplate;
+        this.consumerExecutor = consumerExecutor;
+    }
 
     private RBlockingQueue<Long> flushQueue;
     private RDelayedQueue<Long> delayedQueue;
