@@ -1,7 +1,8 @@
 package com.example.chatservice.message.service;
 
 import com.example.chatservice.chat.repository.UserChatRepository;
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBlockingQueue;
 import org.redisson.api.RDelayedQueue;
@@ -11,24 +12,21 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-
 import java.time.Duration;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 핫 구간에서 스킵된 lastMessageId를 지연 플러시로 밀어 넣는 전용 컴포넌트.
+ * KEYS 명령어 대신 Hash를 사용하여 비블로킹 방식으로 처리한다.
  */
-@Service
 @Slf4j
+@Service
 public class PendingLastMessageFlushService {
 
     private static final String FLUSH_QUEUE = "chat:lastMsg:flushQueue";
+    private static final String PENDING_HASH_KEY = "chat:pendingLastMessages";
     private static final Duration PENDING_TTL = Duration.ofMinutes(10);
 
     private final RedissonClient redissonClient;
@@ -67,10 +65,10 @@ public class PendingLastMessageFlushService {
     @PreDestroy
     void shutdown() {
         log.info("Shutting down PendingLastMessageFlushService, flushing all pending messages...");
-        
+
         // 서버 종료 시 모든 pending 메시지 즉시 flush
         flushAllPendingMessages();
-        
+
         // Executor 종료
         consumerExecutor.shutdownNow();
         try {
@@ -82,34 +80,32 @@ public class PendingLastMessageFlushService {
             Thread.currentThread().interrupt();
             log.warn("Interrupted while waiting for executor termination");
         }
-        
+
         if (delayedQueue != null) {
             delayedQueue.destroy();
         }
-        
+
         log.info("PendingLastMessageFlushService shutdown completed");
     }
-    
+
     /**
      * 서버 종료 시 Redis에 남아있는 모든 pending 메시지를 즉시 flush한다.
+     * KEYS 명령어 대신 Hash entries를 사용하여 비블로킹 방식으로 처리한다.
      */
     private void flushAllPendingMessages() {
         try {
-            Set<String> keys = redisTemplate.keys("chat:*:pendingLastMessage");
-            if (keys == null || keys.isEmpty()) {
+            // Hash에서 모든 pending 메시지 조회 (비블로킹)
+            Map<Object, Object> allPending = redisTemplate.opsForHash().entries(PENDING_HASH_KEY);
+            if (allPending.isEmpty()) {
                 return;
             }
-            
-            Pattern pattern = Pattern.compile("chat:(\\d+):pendingLastMessage");
-            for (String pendingKey : keys) {
-                Matcher matcher = pattern.matcher(pendingKey);
-                if (!matcher.matches()) continue;
-                
+
+            for (Map.Entry<Object, Object> entry : allPending.entrySet()) {
                 try {
-                    Long chatRoomId = Long.parseLong(matcher.group(1));
+                    Long chatRoomId = Long.parseLong(entry.getKey().toString());
                     flush(chatRoomId); // 동기적으로 실행되므로 완료될 때까지 기다림
                 } catch (Exception e) {
-                    log.error("Error flushing pending key={} on shutdown", pendingKey, e);
+                    log.error("Error flushing pending chatRoomId={} on shutdown", entry.getKey(), e);
                 }
             }
         } catch (Exception e) {
@@ -122,7 +118,7 @@ public class PendingLastMessageFlushService {
      * 이미 스케줄링된 경우 새로운 스케줄링을 하지 않는다 (중복 방지).
      */
     public void scheduleFlush(Long chatRoomId, Long messageId, Duration delay) {
-        // 최대 messageId를 Redis에 캐싱 (이미 스케줄링되어 있어도 최신 값으로 업데이트)
+        // 최대 messageId를 Redis Hash에 캐싱 (이미 스케줄링되어 있어도 최신 값으로 업데이트)
         cachePendingMax(chatRoomId, messageId);
 
         // 이미 스케줄링되어 있으면 추가하지 않음
@@ -160,8 +156,8 @@ public class PendingLastMessageFlushService {
      * 핫모드에서 쿨모드로 전환될 때 메모리 누수를 방지하기 위해 사용된다.
      */
     public void flushIfPending(Long chatRoomId) {
-        String pendingKey = pendingKey(chatRoomId);
-        if (!redisTemplate.hasKey(pendingKey)) {
+        // Hash 필드 존재 확인
+        if (!redisTemplate.opsForHash().hasKey(PENDING_HASH_KEY, chatRoomId.toString())) {
             // pending이 없으면 아무것도 하지 않음
             return;
         }
@@ -172,10 +168,10 @@ public class PendingLastMessageFlushService {
     }
 
     private void flush(Long chatRoomId) {
-        String pendingKey = pendingKey(chatRoomId);
-        Object pendingRaw = redisTemplate.opsForValue().get(pendingKey);
+        // Hash에서 개별 필드 조회
+        Object pendingRaw = redisTemplate.opsForHash().get(PENDING_HASH_KEY, chatRoomId.toString());
         if (!(pendingRaw instanceof String pendingIdStr)) {
-            log.debug("No pending lastMessageId found for chatRoomId={}, key={}", chatRoomId, pendingKey);
+            log.debug("No pending lastMessageId found for chatRoomId={}", chatRoomId);
             // 스케줄링 플래그도 정리
             redisTemplate.delete(scheduledKey(chatRoomId));
             return;
@@ -191,30 +187,29 @@ public class PendingLastMessageFlushService {
             log.warn("Invalid pending lastMessageId for chatRoomId={}", chatRoomId);
         } finally {
             // flush 완료 후 관련 Redis 키 모두 정리
-            redisTemplate.delete(pendingKey);
+            redisTemplate.opsForHash().delete(PENDING_HASH_KEY, chatRoomId.toString());
             redisTemplate.delete(scheduledKey(chatRoomId));
         }
     }
 
     private void cachePendingMax(Long chatRoomId, Long messageId) {
-        String key = pendingKey(chatRoomId);
-        Object currentRaw = redisTemplate.opsForValue().get(key);
+        // Hash에서 현재 값 조회
+        Object currentRaw = redisTemplate.opsForHash().get(PENDING_HASH_KEY, chatRoomId.toString());
 
         try {
             if (currentRaw == null || Long.parseLong(currentRaw.toString()) < messageId) {
-                redisTemplate.opsForValue().set(key, String.valueOf(messageId));
-                redisTemplate.expire(key, PENDING_TTL);
+                // Hash 필드에 저장 (최대값만 유지)
+                redisTemplate.opsForHash().put(PENDING_HASH_KEY, chatRoomId.toString(), String.valueOf(messageId));
+                // Hash 전체에 TTL 설정
+                redisTemplate.expire(PENDING_HASH_KEY, PENDING_TTL);
                 log.debug("Cached pending lastMessageId: chatRoomId={}, messageId={}", chatRoomId, messageId);
             }
         } catch (NumberFormatException e) {
-            redisTemplate.opsForValue().set(key, String.valueOf(messageId));
-            redisTemplate.expire(key, PENDING_TTL);
+            // 파싱 오류 시 새로 저장
+            redisTemplate.opsForHash().put(PENDING_HASH_KEY, chatRoomId.toString(), String.valueOf(messageId));
+            redisTemplate.expire(PENDING_HASH_KEY, PENDING_TTL);
             log.debug("Cached pending lastMessageId (reset due to parse error): chatRoomId={}, messageId={}", chatRoomId, messageId);
         }
-    }
-
-    private String pendingKey(Long chatRoomId) {
-        return "chat:%d:pendingLastMessage".formatted(chatRoomId);
     }
 
     private String scheduledKey(Long chatRoomId) {
@@ -224,34 +219,29 @@ public class PendingLastMessageFlushService {
     /**
      * 서버 재시작 시 Redis에 남아있는 pending 메시지들을 복구한다.
      * 서버가 크래시된 경우 scheduledKey는 TTL로 만료되었지만 pendingKey는 남아있을 수 있다.
+     * KEYS 명령어 대신 Hash entries를 사용하여 비블로킹 방식으로 처리한다.
      */
     private void recoverPendingFlushes() {
         try {
-            // Redis에서 모든 pending 키를 스캔 (chat:*:pendingLastMessage 패턴)
-            Set<String> keys = redisTemplate.keys("chat:*:pendingLastMessage");
+            // Hash에서 모든 pending 메시지 조회 (비블로킹)
+            Map<Object, Object> allPending = redisTemplate.opsForHash().entries(PENDING_HASH_KEY);
 
-            if (keys.isEmpty()) {
+            if (allPending == null || allPending.isEmpty()) {
                 log.debug("No pending messages to recover");
                 return;
             }
 
-            Pattern pattern = Pattern.compile("chat:(\\d+):pendingLastMessage");
             int recoveredCount = 0;
 
-            for (String pendingKey : keys) {
-                Matcher matcher = pattern.matcher(pendingKey);
-                if (!matcher.matches()) {
-                    continue;
-                }
-
+            for (Map.Entry<Object, Object> entry : allPending.entrySet()) {
                 try {
-                    Long chatRoomId = Long.parseLong(matcher.group(1));
+                    Long chatRoomId = Long.parseLong(entry.getKey().toString());
                     String scheduledKey = scheduledKey(chatRoomId);
 
                     // scheduledKey가 없거나 만료된 경우 → 서버 크래시 후 복구 상황
                     // 큐에 의존하지 않고 즉시 flush하여 데이터 손실 방지
                     if (!redisTemplate.hasKey(scheduledKey)) {
-                        Object pendingRaw = redisTemplate.opsForValue().get(pendingKey);
+                        Object pendingRaw = entry.getValue();
                         if (pendingRaw instanceof String pendingIdStr) {
                             try {
                                 Long messageId = Long.parseLong(pendingIdStr);
@@ -261,15 +251,15 @@ public class PendingLastMessageFlushService {
                                 flush(chatRoomId);
                                 recoveredCount++;
                             } catch (NumberFormatException e) {
-                                log.warn("Invalid pending messageId in key={}, deleting", pendingKey);
-                                redisTemplate.delete(pendingKey);
+                                log.warn("Invalid pending messageId for chatRoomId={}, deleting", chatRoomId);
+                                redisTemplate.opsForHash().delete(PENDING_HASH_KEY, chatRoomId.toString());
                             }
                         }
                     }
                 } catch (NumberFormatException e) {
-                    log.warn("Invalid chatRoomId in pending key={}", pendingKey);
+                    log.warn("Invalid chatRoomId in pending entry: {}", entry.getKey());
                 } catch (Exception e) {
-                    log.error("Error recovering pending key={}", pendingKey, e);
+                    log.error("Error recovering pending chatRoomId={}", entry.getKey(), e);
                 }
             }
 
@@ -281,4 +271,3 @@ public class PendingLastMessageFlushService {
         }
     }
 }
-
