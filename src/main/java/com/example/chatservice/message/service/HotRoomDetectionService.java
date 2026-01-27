@@ -4,10 +4,13 @@ import com.example.chatservice.property.HotRoomProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -21,10 +24,23 @@ public class HotRoomDetectionService {
     public boolean isHotRoom(Long chatRoomId) {
         Duration hotWindow = Duration.ofSeconds(hotRoomProperty.getWindowSeconds());
         Duration hotModeTtl = Duration.ofSeconds(hotRoomProperty.getModeTtlSeconds());
-        
+
         String countKey = msgCountKey(chatRoomId);
-        Long count = redisTemplate.opsForValue().increment(countKey);
-        redisTemplate.expire(countKey, hotWindow);
+
+        // Pipeline으로 increment + expire를 한 번에 실행
+        List<Object> results = redisTemplate.executePipelined(
+                (RedisCallback<Object>) connection -> {
+                    RedisConnection redisConn = (RedisConnection) connection;
+                    byte[] keyBytes = countKey.getBytes();
+
+                    redisConn.stringCommands().incr(keyBytes);
+                    redisConn.keyCommands().expire(keyBytes, hotWindow.getSeconds());
+                    return null;
+                }
+        );
+
+        // Pipeline 결과에서 count 추출: results[0] = incr 결과, results[1] = expire 결과(사ㅓ용 x)
+        Long count = (Long) results.getFirst();
 
         String modeKey = modeKey(chatRoomId);
         String mode = (String) redisTemplate.opsForValue().get(modeKey);
@@ -47,7 +63,7 @@ public class HotRoomDetectionService {
     public boolean shouldSkipHotUpdate(Long chatRoomId) {
         Duration hotDebounce = Duration.ofSeconds(hotRoomProperty.getDebounceSeconds());
         Duration hotModeTtl = Duration.ofSeconds(hotRoomProperty.getModeTtlSeconds());
-        
+
         String lastKey = lastAppliedKey(chatRoomId);
         String lastTs = (String) redisTemplate.opsForValue().get(lastKey);
         long now = System.currentTimeMillis();
