@@ -25,11 +25,11 @@ spring:
       data-locations: classpath:data.sql
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: localhost:29092,localhost:29093,localhost:29094
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: all
+      acks: 1
       retries: 3
     consumer:
       group-id: chat-server-${server.port}
