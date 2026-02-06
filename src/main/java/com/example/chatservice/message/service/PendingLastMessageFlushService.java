@@ -226,7 +226,7 @@ public class PendingLastMessageFlushService {
             // Hash에서 모든 pending 메시지 조회 (비블로킹)
             Map<Object, Object> allPending = redisTemplate.opsForHash().entries(PENDING_HASH_KEY);
 
-            if (allPending == null || allPending.isEmpty()) {
+            if (allPending.isEmpty()) {
                 log.debug("No pending messages to recover");
                 return;
             }

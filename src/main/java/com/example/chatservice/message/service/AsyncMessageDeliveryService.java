@@ -3,6 +3,7 @@ package com.example.chatservice.message.service;
 import com.example.chatservice.chat.entity.UserChat;
 import com.example.chatservice.chat.repository.UserChatRepository;
 import com.example.chatservice.common.ServerInfoProvider;
+import com.example.chatservice.message.controller.request.MessageRequest;
 import com.example.chatservice.message.entity.Message;
 import com.example.chatservice.message.repository.MessageRepository;
 import com.example.chatservice.sharding.Sharding;
@@ -21,7 +22,7 @@ import java.util.Map;
 
 @Slf4j
 @RequiredArgsConstructor
-@Service
+//@Service -> 지금 사용 안 함
 public class AsyncMessageDeliveryService {
 
     private final MessageRepository messageRepository;
@@ -63,12 +64,12 @@ public class AsyncMessageDeliveryService {
                 userChats.size(), chatRoomId);
 
         String currentServer = serverInfoProvider.getServerAddress();
-        
+
         // 서버별로 유저 그룹핑
         // Key: 서버 주소 (예: "localhost:8081")
         // Value: 해당 서버에 연결된 유저 ID 목록
         Map<String, List<Long>> serverToUserIds = new HashMap<>();
-        
+
         int sameServerCount = 0;
         int offlineCount = 0;
 
@@ -106,7 +107,7 @@ public class AsyncMessageDeliveryService {
         }
 
         log.info("[Async] Message delivery summary: same server={}, different servers={}, offline={}",
-                sameServerCount, 
+                sameServerCount,
                 serverToUserIds.values().stream().mapToInt(List::size).sum(),
                 offlineCount);
 
@@ -123,6 +124,5 @@ public class AsyncMessageDeliveryService {
                         "Sent to {} servers via HTTP batch, {} users on same server, {} offline users",
                 chatRoomId, serverToUserIds.size(), sameServerCount, offlineCount);
     }
-
 
 }

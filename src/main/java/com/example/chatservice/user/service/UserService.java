@@ -1,5 +1,6 @@
 package com.example.chatservice.user.service;
 
+import com.example.chatservice.exception.UserNotFoundException;
 import com.example.chatservice.jwt.JWTProvider;
 import com.example.chatservice.user.controller.request.UserCreateRequest;
 import com.example.chatservice.user.controller.request.UserLoginRequest;
@@ -68,7 +69,7 @@ public class UserService { // UserServiceCGlibSpringProxyTx
         User user = userRepository.findByUsername(userLoginRequest.getUsername());
 
         if (user == null) {
-            throw new RuntimeException("User not found");
+            throw new UserNotFoundException(null);
         }
 
         String accessToken = JWTProvider.generateToken(user.getId(), user.getUsername());

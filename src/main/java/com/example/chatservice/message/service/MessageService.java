@@ -242,7 +242,7 @@ public class MessageService {
      * Message는 Message Shard DB에서 조회하고, ReadStatus는 Main DB에서 업데이트
      */
     @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
-    @Transactional(readOnly = true, transactionManager = "messageTransactionManager")
+    @Transactional(transactionManager = "messageTransactionManager")
     public void markMessagesAsRead(Long currentUserId, Long chatRoomId, Long messageId) {
         // 1. Message 조회 (Message Shard DB)
         Message targetMessage;
