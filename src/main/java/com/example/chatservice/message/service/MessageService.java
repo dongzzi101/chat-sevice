@@ -27,7 +27,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -50,8 +49,9 @@ public class MessageService {
     private final HotRoomDetectionService hotRoomDetectionService;
     private final TransactionTemplate transactionTemplate; // primary TM (main DB)
 
+    /** ChainedTransactionManager: Main + Message 한 트랜잭션으로 묶음 (순서대로 시작, 역순 커밋) */
     @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
-    @Transactional(transactionManager = "messageTransactionManager")
+    @Transactional(transactionManager = "chainedTransactionManager")
     public void sendMessageViaWebSocket(Long senderId, Long receiverId,
                                         Long chatRoomId, String content) {
 
@@ -69,78 +69,73 @@ public class MessageService {
 
         messageRepository.saveAndFlush(message);
 
-        updateUserChatLastMessage(chatRoom, message.getId());
+        // 같은 chained tx 안에서 Main DB 작업
+        performUserChatLastMessageUpdate(chatRoom, message.getId());
+        performSenderReadStatusUpdate(senderUser.getId(), chatRoom.getId(), message.getId());
 
-        // ReadStatus 업데이트 (발신자) - Main DB 트랜잭션으로 분리
-        updateSenderReadStatus(senderUser.getId(), chatRoom.getId(), message.getId());
-
-        // 발신자 본인에게 즉시 전송 (동기)
         log.info("Sending message to sender {} immediately", senderId);
         messageDeliveryService.deliverMessage(senderId, message);
 
-        // 트랜잭션 커밋 후 다른 사용자들에게는 Kafka를 통해 비동기로 전송
         Long messageId = message.getId();
-        LocalDateTime createdAt = message.getCreatedAt();
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        ChatMessageEvent event =
-                                new ChatMessageEvent(
-                                        message.getId(),
-                                        message.getSenderId(),
-                                        message.getMessage(),
-                                        message.getChatRoomId(),
-                                        message.getCreatedAt()
-                                );
-
+                        ChatMessageEvent event = new ChatMessageEvent(
+                                message.getId(),
+                                message.getSenderId(),
+                                message.getMessage(),
+                                message.getChatRoomId(),
+                                message.getCreatedAt()
+                        );
                         chatMessageProducer.sendMessage(event);
                     }
                 }
         );
     }
 
-    private void updateUserChatLastMessage(ChatRoom chatRoom, Long messageId) {
+    /** Main DB 업데이트 핵심 로직 (호출 시점의 트랜잭션에서 실행) */
+    private void performUserChatLastMessageUpdate(ChatRoom chatRoom, Long messageId) {
         boolean hotRoom = hotRoomDetectionService.isHotRoom(chatRoom.getId());
 
         if (hotRoom && hotRoomDetectionService.shouldSkipHotUpdate(chatRoom.getId())) {
-            // 핫모드이고 debounce 시간 내 → 스케줄링
             pendingLastMessageFlushService.scheduleFlush(
-                    chatRoom.getId(), 
-                    messageId, 
+                    chatRoom.getId(),
+                    messageId,
                     hotRoomDetectionService.getDebounceDuration()
             );
             return;
         }
-
-        // 핫모드가 아니거나 debounce가 끝남 → 즉시 DB 업데이트
-        // 핫모드에서 쿨모드로 전환된 경우, 남아있는 pending도 함께 flush
         pendingLastMessageFlushService.flushIfPending(chatRoom.getId());
-        
-        // main DB 업데이트는 메인 TxManager로 분리 실행
+        userChatRepository.updateLastMessageIdForChat(chatRoom.getId(), messageId);
+    }
+
+    /** Main DB만 쓸 때 사용 (별도 tx) */
+    private void updateUserChatLastMessage(ChatRoom chatRoom, Long messageId) {
         transactionTemplate.executeWithoutResult(status ->
-                userChatRepository.updateLastMessageIdForChat(chatRoom.getId(), messageId)
+                performUserChatLastMessageUpdate(chatRoom, messageId)
         );
     }
 
-    /**
-     * 발신자의 ReadStatus 업데이트 (Main DB 트랜잭션으로 분리)
-     */
+    /** ReadStatus 업데이트 핵심 로직 (호출 시점의 트랜잭션에서 실행) */
+    private void performSenderReadStatusUpdate(Long senderId, Long chatRoomId, Long messageId) {
+        User senderUser = userRepository.findById(senderId)
+                .orElseThrow(() -> new UserNotFoundException(senderId));
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId)
+                .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
+
+        ReadStatus senderReadStatus = readStatusService.getOrCreateReadStatus(senderUser, chatRoom);
+        Long currentLastRead = senderReadStatus.getLastReadMessageId();
+        if (currentLastRead == null || messageId > currentLastRead) {
+            senderReadStatus.updateReadMessage(messageId);
+        }
+    }
+
+    /** Main DB만 쓸 때 사용 (별도 tx) */
     private void updateSenderReadStatus(Long senderId, Long chatRoomId, Long messageId) {
-        transactionTemplate.executeWithoutResult(status -> {
-            User senderUser = userRepository.findById(senderId)
-                    .orElseThrow(() -> new UserNotFoundException(senderId));
-            ChatRoom chatRoom = chatRepository.findById(chatRoomId)
-                    .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
-            
-            ReadStatus senderReadStatus = readStatusService.getOrCreateReadStatus(senderUser, chatRoom);
-            Long currentLastRead = senderReadStatus.getLastReadMessageId();
-            
-            // 새로운 메시지만 업데이트 (뒤로 가지 않음)
-            if (currentLastRead == null || messageId > currentLastRead) {
-                senderReadStatus.updateReadMessage(messageId);
-            }
-        });
+        transactionTemplate.executeWithoutResult(status ->
+                performSenderReadStatusUpdate(senderId, chatRoomId, messageId)
+        );
     }
 
     @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
@@ -238,21 +233,19 @@ public class MessageService {
     }
 
     /**
-     * 메시지 읽음 처리
-     * Message는 Message Shard DB에서 조회하고, ReadStatus는 Main DB에서 업데이트
+     * 메시지 읽음 처리 (ChainedTransactionManager: Message 조회 + ReadStatus 업데이트 한 tx)
      */
     @Sharding(target = ShardingTarget.MESSAGE, key = "#chatRoomId")
-    @Transactional(transactionManager = "messageTransactionManager")
+    @Transactional(transactionManager = "chainedTransactionManager")
     public void markMessagesAsRead(Long currentUserId, Long chatRoomId, Long messageId) {
-        // 1. Message 조회 (Message Shard DB)
         Message targetMessage;
         if (messageId != null) {
             targetMessage = messageRepository.findById(messageId).orElse(null);
             if (targetMessage == null) {
                 log.warn("Message not found for ACK: messageId={}, userId={}, chatRoomId={}. " +
-                        "This may happen if messageId is incorrect or message was deleted.", 
+                        "This may happen if messageId is incorrect or message was deleted.",
                         messageId, currentUserId, chatRoomId);
-                return; // 메시지가 없으면 읽음 처리하지 않음
+                return;
             }
         } else {
             targetMessage = messageRepository
@@ -261,31 +254,30 @@ public class MessageService {
         }
 
         if (targetMessage == null) {
-            return; // 채팅방에 메시지가 없으면 아무 것도 하지 않음
+            return;
         }
 
-        // 2. ReadStatus 업데이트 (Main DB 트랜잭션으로 분리)
-        Long targetMessageId = targetMessage.getId();
-        updateReadStatus(currentUserId, chatRoomId, targetMessageId);
+        performReadStatusUpdate(currentUserId, chatRoomId, targetMessage.getId());
     }
 
-    /**
-     * ReadStatus 업데이트 (Main DB 트랜잭션으로 분리)
-     */
+    /** ReadStatus 업데이트 핵심 로직 (호출 시점의 트랜잭션에서 실행) */
+    private void performReadStatusUpdate(Long userId, Long chatRoomId, Long messageId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
+        ChatRoom chatRoom = chatRepository.findById(chatRoomId)
+                .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
+
+        ReadStatus userReadStatus = readStatusService.getOrCreateReadStatus(user, chatRoom);
+        Long currentLastRead = userReadStatus.getLastReadMessageId();
+        if (currentLastRead == null || messageId > currentLastRead) {
+            userReadStatus.updateReadMessage(messageId);
+        }
+    }
+
+    /** Main DB만 쓸 때 사용 (별도 tx) */
     private void updateReadStatus(Long userId, Long chatRoomId, Long messageId) {
-        transactionTemplate.executeWithoutResult(status -> {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new UserNotFoundException(userId));
-            ChatRoom chatRoom = chatRepository.findById(chatRoomId)
-                    .orElseThrow(() -> new ChatRoomNotFoundException(chatRoomId));
-            
-            ReadStatus userReadStatus = readStatusService.getOrCreateReadStatus(user, chatRoom);
-            Long currentLastRead = userReadStatus.getLastReadMessageId();
-            
-            // 새로운 메시지만 업데이트 (뒤로 가지 않음)
-            if (currentLastRead == null || messageId > currentLastRead) {
-                userReadStatus.updateReadMessage(messageId);
-            }
-        });
+        transactionTemplate.executeWithoutResult(status ->
+                performReadStatusUpdate(userId, chatRoomId, messageId)
+        );
     }
 }
