@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * Kafka로 전송되는 채팅 메시지 이벤트
@@ -20,6 +21,16 @@ public class ChatMessageEvent {
     private String content;
     private Long chatRoomId;
     private LocalDateTime createdAt;
+
+    public Map<String, Object> toWebSocketPayload() {
+        return Map.of(
+            "messageId", messageId,
+            "senderId", senderId,
+            "content", content,
+            "chatRoomId", chatRoomId,
+            "createdAt", createdAt
+        );
+    }
 }
 
 

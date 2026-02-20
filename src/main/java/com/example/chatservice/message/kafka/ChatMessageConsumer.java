@@ -84,14 +84,8 @@ public class ChatMessageConsumer {
             log.info("[Kafka Consumer] Delivering to {} users on this server ({})", 
                     myUsers.size(), myServer);
             
-            // 4. WebSocket으로 전달
-            Map<String, Object> messageData = Map.of(
-                "messageId", event.getMessageId(),
-                "senderId", event.getSenderId(),
-                "content", event.getContent(),
-                "chatRoomId", event.getChatRoomId(),
-                "createdAt", event.getCreatedAt()
-            );
+            // 4. WebSocket으로 전달 (Event와 동일한 payload)
+            Map<String, Object> messageData = event.toWebSocketPayload();
             
             int successCount = 0;
             int failCount = 0;
